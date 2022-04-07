@@ -85,16 +85,16 @@ class unimib_load_dataset(Dataset):
         
         
         #Download and unzip original dataset
-        if (not os.path.isfile('UniMiB-SHAR.zip')):
+        if (not os.path.isfile('../UniMiB-SHAR.zip')):
             print("Downloading UniMiB-SHAR.zip file")
             #invoking the shell command fails when exported to .py file
             #redirect link https://www.dropbox.com/s/raw/x2fpfqj0bpf8ep6/UniMiB-SHAR.zip
             #!wget https://www.dropbox.com/s/x2fpfqj0bpf8ep6/UniMiB-SHAR.zip
-            self.download_url('https://www.dropbox.com/s/raw/x2fpfqj0bpf8ep6/UniMiB-SHAR.zip', 'UniMiB-SHAR.zip')
-        if (not os.path.isdir('UniMiB-SHAR')):
-            shutil.unpack_archive('UniMiB-SHAR.zip', '.', 'zip')
+            self.download_url('https://www.dropbox.com/s/raw/x2fpfqj0bpf8ep6/UniMiB-SHAR.zip', '../UniMiB-SHAR.zip')
+        if (not os.path.isdir('../UniMiB-SHAR')):
+            shutil.unpack_archive('../UniMiB-SHAR.zip', '.', 'zip')
         #Convert .mat files to numpy ndarrays
-        path_in = 'UniMiB-SHAR/data'
+        path_in = '../UniMiB-SHAR/data'
         #loadmat loads matlab files as dictionary, keys: header, version, globals, data
         adl_data = io.loadmat(path_in + '/adl_data.mat')['adl_data']
         adl_names = io.loadmat(path_in + '/adl_names.mat', chars_as_strings=True)['adl_names']

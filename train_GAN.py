@@ -2,8 +2,8 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
-import cfg
-from dataLoader import *
+from config import cfg
+from utils.dataLoader import *
 from models.GANModels import *
 from utils.functions import train, save_samples, LinearLrDecay, load_params, copy_params
 from utils.utils import set_log_dir, save_checkpoint, create_logger
