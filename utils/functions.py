@@ -134,18 +134,17 @@ def train(args, gen_net: nn.Module, dis_net: nn.Module, gen_optimizer, dis_optim
         # -----------------
         #  Train Generator   (here it's wise coding way: the generator would be trained only when it's integer multiples of n_critic * accumualated_times)
         # -----------------
-        g_loss = 0.
         if global_steps % (args.n_critic * args.accumulated_times) == 0:
             
             for accumulated_idx in range(args.g_accumulated_times):
-                gen_z = torch.cuda.FloatTensor(np.random.normal(0, 1, (args.gen_batch_size, args.noise_dim)))
+                gen_z = torch.cuda.FloatTensor(np.random.normal(0, 1, (args.batch_size, args.noise_dim)))
                 gen_imgs = gen_net(gen_z)
                 fake_validity = dis_net(gen_imgs)
 
                 # cal loss
                 loss_lz = torch.tensor(0)
                 if args.loss == "standard":
-                    real_label = torch.full((args.gen_batch_size,), 1., dtype=torch.float, device=real_imgs.get_device())
+                    real_label = torch.full((args.batch_size,), 1., dtype=torch.float, device=real_imgs.get_device())
                     fake_validity = nn.Sigmoid()(fake_validity.view(-1))
                     g_loss = nn.BCELoss()(fake_validity.view(-1), real_label)
                 if args.loss == "lsgan":
@@ -159,8 +158,8 @@ def train(args, gen_net: nn.Module, dis_net: nn.Module, gen_optimizer, dis_optim
                         # fake_validity = nn.Sigmoid()(fake_validity.view(-1))
                         g_loss = nn.MSELoss()(fake_validity, real_label)
                 elif args.loss == 'wgangp-mode':
-                    fake_image1, fake_image2 = gen_imgs[:args.gen_batch_size//2], gen_imgs[args.gen_batch_size//2:]
-                    z_random1, z_random2 = gen_z[:args.gen_batch_size//2], gen_z[args.gen_batch_size//2:]
+                    fake_image1, fake_image2 = gen_imgs[:args.batch_size//2], gen_imgs[args.batch_size//2:]
+                    z_random1, z_random2 = gen_z[:args.batch_size//2], gen_z[args.batch_size//2:]
                     lz = torch.mean(torch.abs(fake_image2 - fake_image1)) / torch.mean(
                     torch.abs(z_random2 - z_random1))
                     eps = 1 * 1e-5
@@ -189,10 +188,10 @@ def train(args, gen_net: nn.Module, dis_net: nn.Module, gen_optimizer, dis_optim
 
             # moving average weight
             ema_nimg = args.ema_kimg * 1000
-            cur_nimg = args.dis_batch_size * args.world_size * global_steps
+            cur_nimg = args.batch_size * args.world_size * global_steps
             if args.ema_warmup != 0:
                 ema_nimg = min(ema_nimg, cur_nimg * args.ema_warmup)
-                ema_beta = 0.5 ** (float(args.dis_batch_size * args.world_size) / max(ema_nimg, 1e-8))
+                ema_beta = 0.5 ** (float(args.batch_size * args.world_size) / max(ema_nimg, 1e-8))
             else:
                 ema_beta = args.ema
                 
@@ -207,8 +206,9 @@ def train(args, gen_net: nn.Module, dis_net: nn.Module, gen_optimizer, dis_optim
             writer.add_scalar('Generator fake validity', fake_validity.mean().item(), global_steps//args.n_critic) if args.rank == 0 else 0
             wandb.log({"Generator loss per iteration": g_loss.item(),
                        "Generator fake validity": fake_validity.mean().item()})
+            g_loss_sum = g_loss_sum + g_loss
+            wandb.log({"Sum of Generator loss per epoch": g_loss_sum.item()})
 
-        g_loss_sum = g_loss_sum + g_loss
         d_loss_sum = d_loss_sum + d_loss
         # verbose
         if gen_step and iter_idx % args.print_freq == 0 and args.rank == 0:
@@ -224,8 +224,7 @@ def train(args, gen_net: nn.Module, dis_net: nn.Module, gen_optimizer, dis_optim
 
         writer_dict['train_global_steps'] = global_steps + 1
 
-        wandb.log({"Sum of Generator loss per epoch": g_loss_sum.item(),
-               "Sum of Discriminator Loss per epoch": d_loss_sum.item()})
+        wandb.log({"Sum of Discriminator Loss per epoch": d_loss_sum.item()})
 
 def save_samples(args, fixed_z, epoch, gen_net: nn.Module, writer_dict, clean_dir=True):
 

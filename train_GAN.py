@@ -3,7 +3,7 @@ from __future__ import division
 from __future__ import print_function
 
 from config import cfg
-from utils.dataLoader import *
+from dataset.UniMiB.dataLoader import *
 from models.GANModels import *
 from utils.functions import train, save_samples, LinearLrDecay, load_params, copy_params
 from utils.utils import set_log_dir, save_checkpoint, create_logger
@@ -110,6 +110,7 @@ def main_worker(gpu, ngpus_per_node, args):
     print('------------------------------------------------------------')
     print('Data Loadering ~ Wait ~')
     print('------------------------------------------------------------')
+
     # train_set = VTSDataset(set_type = 'train')
     # test_set = TSDataset(set_type = 'test')
     # [batch_size, channles, seq-len]
@@ -285,9 +286,9 @@ def main_worker(gpu, ngpus_per_node, args):
             'epoch': epoch + 1,
             'gen_model': args.gen_model,
             'dis_model': args.dis_model,
-            'gen_state_dict': gen_net.module.state_dict(),
-            'dis_state_dict': dis_net.module.state_dict(),
-            'avg_gen_state_dict': avg_gen_net.module.state_dict(),
+            'gen_state_dict': gen_net.state_dict(),
+            'dis_state_dict': dis_net.state_dict(),
+            'avg_gen_state_dict': avg_gen_net.state_dict(),
             'gen_optimizer': gen_optimizer.state_dict(),
             'dis_optimizer': dis_optimizer.state_dict(),
             'path_helper': args.path_helper,
