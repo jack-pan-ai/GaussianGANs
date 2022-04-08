@@ -13,7 +13,7 @@ def parse_args():
 args = parse_args()
 
 os.system(f"CUDA_VISIBLE_DEVICES=0,1,2,3,4,5,6,7 python train_GAN.py \
---gpu 0 \
+--gpu 1 \
 --dist-url 'tcp://localhost:4321' \
 --dist-backend 'nccl' \
 --world-size 1 \
@@ -23,13 +23,14 @@ os.system(f"CUDA_VISIBLE_DEVICES=0,1,2,3,4,5,6,7 python train_GAN.py \
 --gen_model my_gen \
 --dis_model my_dis \
 --heads 5 \
---noise_dim 32 \
+--noise_dim 64 \
 --num_workers 16 \
 --g_lr 0.0001 \
 --d_lr 0.0003 \
 --loss lsgan \
 --phi 1 \
---batch_size 16 \
+--batch_size 128 \
+--epochs 10000 \
 --print_freq 50 \
 --ema_kimg 500 \
 --ema_warmup 0.1 \

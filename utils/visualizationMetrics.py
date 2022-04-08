@@ -40,22 +40,22 @@ def visualization (ori_data, generated_data, analysis, save_name, epoch, args):
         if type(generated_data) is torch.Tensor:
             generated_data = np.asarray(generated_data.to('cpu'))
     elif type(generated_data) is np.ndarray:
-        generated_data = np.asnumpy(generated_data)
+        generated_data = np.asarray(generated_data)
     else:
         print('The generated is not either torch.tensor, nor np.ndarray. Please check your data type for the output of generator.')
         raise TypeError
 
-    no, seq_len, dim = ori_data.shape  
+    no, channles, seq_len = ori_data.shape
 
     for i in range(anal_sample_no):
         if (i == 0):
-            prep_data = np.reshape(np.mean(ori_data[0,:,:], 1), [1,seq_len])
-            prep_data_hat = np.reshape(np.mean(generated_data[0,:,:],1), [1,seq_len])
+            prep_data = np.reshape(np.mean(ori_data[0,:,:], 1), [1,channles])
+            prep_data_hat = np.reshape(np.mean(generated_data[0,:,:],1), [1,channles])
         else:
             prep_data = np.concatenate((prep_data, 
-                                        np.reshape(np.mean(ori_data[i,:,:],1), [1,seq_len])))
+                                        np.reshape(np.mean(ori_data[i,:,:],1), [1,channles])))
             prep_data_hat = np.concatenate((prep_data_hat, 
-                                        np.reshape(np.mean(generated_data[i,:,:],1), [1,seq_len])))
+                                        np.reshape(np.mean(generated_data[i,:,:],1), [1,channles])))
     
     # Visualization parameter        
     colors = ["red" for i in range(anal_sample_no)] + ["blue" for i in range(anal_sample_no)]    
