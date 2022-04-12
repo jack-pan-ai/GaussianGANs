@@ -125,16 +125,23 @@ def main_worker(gpu, ngpus_per_node, args):
     print('------------------------------------------------------------')
     print('How many iterations in a training epoch: ', len(train_loader))
     print('------------------------------------------------------------')
-    assert len(test_set) >= args.eval_num, 'The number of evaluation should be less than test_set'
+    assert len(train_set) >= args.eval_num, 'The number of evaluation should be less than test_set'
 
     channels, seq_len = train_set[1].shape
     if not seq_len % args.heads == 0:
         print('The heads of  in transformer should be divisibke by the length of sequence of length, such as: seq_len = integer * heads ')
         raise ValueError
     # import network
-    gen_net = Generator(seq_len=seq_len, channels=channels, num_heads= args.heads,noise_dim=args.noise_dim, depth=args.g_depth)
-    summary(gen_net, (args.batch_size, args.noise_dim))
-    dis_net = Discriminator(seq_len=seq_len, channels=channels, num_heads=args.heads, depth=args.d_depth)
+    if args.gpu is not None:
+        x_fixed = torch.randn([1, channels, seq_len]).cuda(args.gpu)
+    else:
+        x_fixed = torch.randn([1, channels, seq_len], device = 'cuda')
+    gen_net = Generator(x_fixed=x_fixed,
+                        seq_len=seq_len, channels=channels,
+                        num_heads= args.heads,noise_dim=args.noise_dim,
+                        depth=args.g_depth)
+    dis_net = Discriminator(seq_len=seq_len, channels=channels,
+                            num_heads=args.heads, depth=args.d_depth)
     #print(dis_net)
     print('------------------------------------------------------------')
     print('Copy Gen/Dis networks to gpu')
@@ -183,6 +190,9 @@ def main_worker(gpu, ngpus_per_node, args):
     if args.gpu is not None:
         print('However, you are just using gpu', args.gpu)
     print('------------------------------------------------------------')
+
+    # model size for generator
+    summary(gen_net, (args.batch_size, args.noise_dim))
 
     # set optimizer
     if args.optimizer == "adam":
@@ -273,7 +283,7 @@ def main_worker(gpu, ngpus_per_node, args):
                 sample_imgs = save_samples(args, fixed_z, epoch + 1, gen_net, writer_dict)
                 #load_params(gen_net, backup_param, args)
                 # plot the generated data for every 5 epoch
-                visualization(ori_data=test_set[:args.eval_num], generated_data=sample_imgs, analysis='pca',
+                visualization(ori_data=train_set[:args.eval_num], generated_data=sample_imgs, analysis='pca',
                               save_name=args.exp_name, epoch=epoch, args = args)
                 image = plt.imread(os.path.join(args.path_helper['log_path_img'],f'{args.exp_name}_epoch_{epoch+1}.png'))
                 image = rearrange(image, 'h w c -> c h w')

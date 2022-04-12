@@ -49,13 +49,13 @@ def visualization (ori_data, generated_data, analysis, save_name, epoch, args):
 
     for i in range(anal_sample_no):
         if (i == 0):
-            prep_data = np.reshape(np.mean(ori_data[0,:,:], 1), [1,channles])
-            prep_data_hat = np.reshape(np.mean(generated_data[0,:,:],1), [1,channles])
+            prep_data = np.reshape(np.mean(ori_data[0,:,:], 0), [1,seq_len])
+            prep_data_hat = np.reshape(np.mean(generated_data[0,:,:],0), [1,seq_len])
         else:
             prep_data = np.concatenate((prep_data, 
-                                        np.reshape(np.mean(ori_data[i,:,:],1), [1,channles])))
+                                        np.reshape(np.mean(ori_data[i,:,:],0), [1,seq_len])))
             prep_data_hat = np.concatenate((prep_data_hat, 
-                                        np.reshape(np.mean(generated_data[i,:,:],1), [1,channles])))
+                                        np.reshape(np.mean(generated_data[i,:,:],0), [1,seq_len])))
     
     # Visualization parameter        
     colors = ["red" for i in range(anal_sample_no)] + ["blue" for i in range(anal_sample_no)]    
@@ -68,13 +68,20 @@ def visualization (ori_data, generated_data, analysis, save_name, epoch, args):
         pca_hat_results = pca.transform(prep_data_hat)
 
         # Plotting
-        f, ax = plt.subplots(1)    
+        ## fixed x,y axis
+        x_min = np.min(pca_results[:, 0]) * args.swell_ratio
+        x_max = np.max(pca_results[:, 0]) * args.swell_ratio
+        y_min = np.min(pca_results[:, 1]) * args.swell_ratio
+        y_max = np.max(pca_results[:, 1]) * args.swell_ratio
+        f, ax = plt.subplots(1)
+        plt.xlim([x_min, x_max])
+        plt.ylim([y_min, y_max])
         plt.scatter(pca_results[:,0], pca_results[:,1],
                     c = colors[:anal_sample_no], alpha = 0.2, label = "Original")
         plt.scatter(pca_hat_results[:,0], pca_hat_results[:,1], 
                     c = colors[anal_sample_no:], alpha = 0.2, label = "Synthetic")
 
-        ax.legend()  
+        ax.legend(loc = 1)
         plt.title('PCA plot')
         plt.xlabel('x-pca')
         plt.ylabel('y_pca')
@@ -88,17 +95,19 @@ def visualization (ori_data, generated_data, analysis, save_name, epoch, args):
         # TSNE anlaysis
         tsne = TSNE(n_components = 2, verbose = 1, perplexity = 40, n_iter = 300)
         tsne_results = tsne.fit_transform(prep_data_final)
-
+        x_min = np.min(tsne_results[:anal_sample_no, 0]) * args.swell_ratio
+        x_max = np.max(tsne_results[:anal_sample_no, 0]) * args.swell_ratio
+        y_min = np.min(tsne_results[:anal_sample_no, 1]) * args.swell_ratio
+        y_max = np.max(tsne_results[:anal_sample_no, 1]) * args.swell_ratio
         # Plotting
         f, ax = plt.subplots(1)
-
+        plt.xlim([x_min, x_max])
+        plt.ylim([y_min, y_max])
         plt.scatter(tsne_results[:anal_sample_no,0], tsne_results[:anal_sample_no,1], 
                     c = colors[:anal_sample_no], alpha = 0.2, label = "Original")
         plt.scatter(tsne_results[anal_sample_no:,0], tsne_results[anal_sample_no:,1], 
                     c = colors[anal_sample_no:], alpha = 0.2, label = "Synthetic")
-
-        ax.legend()
-
+        ax.legend(loc=1)
         plt.title('t-SNE plot')
         plt.xlabel('x-tsne')
         plt.ylabel('y_tsne')

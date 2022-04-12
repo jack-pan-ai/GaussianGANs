@@ -26,7 +26,7 @@ logger = logging.getLogger(__name__)
 def compute_gradient_penalty(D, real_samples, fake_samples, phi):
     """Calculates the gradient penalty loss for WGAN GP"""
     # Random weight term for interpolation between real and fake samples
-    alpha = torch.Tensor(np.random.random((real_samples.size(0), 1, 1, 1))).to(real_samples.get_device())
+    alpha = torch.Tensor(np.random.random((real_samples.size(0), 1, 1))).to(real_samples.get_device())
     # Get random interpolation between real and fake samples
     interpolates = (alpha * real_samples + ((1 - alpha) * fake_samples)).requires_grad_(True)
     d_interpolates = D(interpolates)
@@ -36,9 +36,6 @@ def compute_gradient_penalty(D, real_samples, fake_samples, phi):
         outputs=d_interpolates,
         inputs=interpolates,
         grad_outputs=fake,
-        create_graph=True,
-        retain_graph=True,
-        only_inputs=True,
     )[0]
     gradients = gradients.reshape(gradients.size(0), -1)
     gradient_penalty = ((gradients.norm(2, dim=1) - phi) ** 2).mean()
@@ -61,7 +58,7 @@ def train(args, gen_net: nn.Module, dis_net: nn.Module, gen_optimizer, dis_optim
         # Adversarial ground truths
         real_imgs = imgs.type(torch.cuda.FloatTensor).cuda(args.gpu, non_blocking=True)
         # Sample noise as generator input [batch_size, noise_dim] (noise _dim is dimension for Gaussain Noise)
-        z = torch.cuda.FloatTensor(np.random.normal(0, 1, (imgs.shape[0], args.noise_dim))).cuda(args.gpu, non_blocking=True)
+        z = torch.randn([imgs.shape[0], args.noise_dim]).cuda(args.gpu, non_blocking=True)
 
         # ---------------------
         #  Train Discriminator
@@ -71,40 +68,22 @@ def train(args, gen_net: nn.Module, dis_net: nn.Module, gen_optimizer, dis_optim
         assert fake_imgs.size() == real_imgs.size(), f"fake_imgs.size(): {fake_imgs.size()} real_imgs.size(): {real_imgs.size()}"
         fake_validity = dis_net(fake_imgs)
 
-        # cal loss
-        if args.loss == 'hinge':
-            d_loss = 0
-            d_loss += torch.mean(nn.ReLU(inplace=True)(1.0 - real_validity)) + \
-                    torch.mean(nn.ReLU(inplace=True)(1 + fake_validity))
-        elif args.loss == 'standard':
+        if args.loss == 'standard':
             #soft label
-            real_label = torch.full((imgs.shape[0],), 0.9, dtype=torch.float, device=real_imgs.get_device())
-            fake_label = torch.full((imgs.shape[0],), 0.1, dtype=torch.float, device=real_imgs.get_device())
-            real_validity = nn.Sigmoid()(real_validity.view(-1))
-            fake_validity = nn.Sigmoid()(fake_validity.view(-1))
+            real_label = torch.full((real_validity.shape[0],), 0.9, dtype=torch.float, device=real_imgs.get_device())
+            fake_label = torch.full((fake_validity.shape[0],), 0.1, dtype=torch.float, device=real_imgs.get_device())
+            real_validity = real_validity.view(-1)
+            fake_validity = fake_validity.view(-1)
             d_real_loss = nn.BCELoss()(real_validity, real_label)
             d_fake_loss = nn.BCELoss()(fake_validity, fake_label)
             d_loss = d_real_loss + d_fake_loss
         elif args.loss == 'lsgan':
-            if isinstance(fake_validity, list):
-                d_loss = 0
-                for real_validity_item, fake_validity_item in zip(real_validity, fake_validity):
-                    real_label = torch.full((real_validity_item.shape[0],real_validity_item.shape[1]), 1., dtype=torch.float, device=real_imgs.get_device())
-                    fake_label = torch.full((real_validity_item.shape[0],real_validity_item.shape[1]), 0., dtype=torch.float, device=real_imgs.get_device())
-                    d_real_loss = nn.MSELoss()(real_validity_item, real_label)
-                    d_fake_loss = nn.MSELoss()(fake_validity_item, fake_label)
-                    d_loss += d_real_loss + d_fake_loss
-            else:
-                real_label = torch.full((real_validity.shape[0],real_validity.shape[1]), 1., dtype=torch.float, device=real_imgs.get_device())
-                fake_label = torch.full((real_validity.shape[0],real_validity.shape[1]), 0., dtype=torch.float, device=real_imgs.get_device())
-                d_real_loss = nn.MSELoss()(real_validity, real_label)
-                d_fake_loss = nn.MSELoss()(fake_validity, fake_label)
-                d_loss = d_real_loss + d_fake_loss
+            real_label = torch.full(real_validity.shape, 1., dtype=torch.float, device=real_imgs.get_device())
+            fake_label = torch.full(real_validity.shape, 0., dtype=torch.float, device=real_imgs.get_device())
+            d_real_loss = nn.MSELoss()(real_validity, real_label)
+            d_fake_loss = nn.MSELoss()(fake_validity, fake_label)
+            d_loss = d_real_loss + d_fake_loss
         elif args.loss == 'wgangp':
-            gradient_penalty = compute_gradient_penalty(dis_net, real_imgs, fake_imgs.detach(), args.phi)
-            d_loss = -torch.mean(real_validity) + torch.mean(fake_validity) + gradient_penalty * 10 / (
-                    args.phi ** 2)
-        elif args.loss == 'wgangp-mode':
             gradient_penalty = compute_gradient_penalty(dis_net, real_imgs, fake_imgs.detach(), args.phi)
             d_loss = -torch.mean(real_validity) + torch.mean(fake_validity) + gradient_penalty * 10 / (
                     args.phi ** 2)
@@ -113,6 +92,10 @@ def train(args, gen_net: nn.Module, dis_net: nn.Module, gen_optimizer, dis_optim
             d_loss = -torch.mean(real_validity) + torch.mean(fake_validity) + gradient_penalty * 10 / (
                     args.phi ** 2)
             d_loss += (torch.mean(real_validity) ** 2) * 1e-3
+        elif args.loss == 'wgangp-mode':
+            gradient_penalty = compute_gradient_penalty(dis_net, real_imgs, fake_imgs.detach(), args.phi)
+            d_loss = -torch.mean(real_validity) + torch.mean(fake_validity) + gradient_penalty * 10 / (
+                    args.phi ** 2)
         else:
             raise NotImplementedError(args.loss)
         d_loss = d_loss/float(args.accumulated_times)
@@ -137,26 +120,19 @@ def train(args, gen_net: nn.Module, dis_net: nn.Module, gen_optimizer, dis_optim
         if global_steps % (args.n_critic * args.accumulated_times) == 0:
             
             for accumulated_idx in range(args.g_accumulated_times):
-                gen_z = torch.cuda.FloatTensor(np.random.normal(0, 1, (args.batch_size, args.noise_dim)))
+                gen_z =  torch.randn([imgs.shape[0], args.noise_dim]).cuda(args.gpu, non_blocking = True)
                 gen_imgs = gen_net(gen_z)
                 fake_validity = dis_net(gen_imgs)
 
                 # cal loss
                 loss_lz = torch.tensor(0)
                 if args.loss == "standard":
-                    real_label = torch.full((args.batch_size,), 1., dtype=torch.float, device=real_imgs.get_device())
-                    fake_validity = nn.Sigmoid()(fake_validity.view(-1))
-                    g_loss = nn.BCELoss()(fake_validity.view(-1), real_label)
+                    # -log(D(G(z)))
+                    fake_validity = fake_validity.view(-1)
+                    g_loss = - torch.log(fake_validity)
                 if args.loss == "lsgan":
-                    if isinstance(fake_validity, list):
-                        g_loss = 0
-                        for fake_validity_item in fake_validity:
-                            real_label = torch.full((fake_validity_item.shape[0],fake_validity_item.shape[1]), 1., dtype=torch.float, device=real_imgs.get_device())
-                            g_loss += nn.MSELoss()(fake_validity_item, real_label)
-                    else:
-                        real_label = torch.full((fake_validity.shape[0],fake_validity.shape[1]), 1., dtype=torch.float, device=real_imgs.get_device())
-                        # fake_validity = nn.Sigmoid()(fake_validity.view(-1))
-                        g_loss = nn.MSELoss()(fake_validity, real_label)
+                    real_label = torch.full((fake_validity.shape[0],), 1., dtype=torch.float, device=real_imgs.get_device())
+                    g_loss = nn.MSELoss()(fake_validity.view(-1), real_label)
                 elif args.loss == 'wgangp-mode':
                     fake_image1, fake_image2 = gen_imgs[:args.batch_size//2], gen_imgs[args.batch_size//2:]
                     z_random1, z_random2 = gen_z[:args.batch_size//2], gen_z[args.batch_size//2:]

@@ -105,7 +105,7 @@ def parse_args():
     parser.add_argument(
         '--n_critic',
         type=int,
-        default=3,
+        default=1,
         help='number of training steps for discriminator per iter')
     parser.add_argument(
         '--val_freq',
@@ -171,7 +171,6 @@ def parse_args():
         default='controller',
         help='path of controller')
     parser.add_argument('--eval_batch_size', type=int, default=100)
-    parser.add_argument('--num_eval_imgs', type=int, default=50000)
     parser.add_argument(
         '--bottom_width',
         type=int,
@@ -195,8 +194,6 @@ def parse_args():
                         help='the size of hidden vector')
     parser.add_argument('--baseline_decay', type=float, default=0.9,
                         help='baseline decay rate in RL')
-    parser.add_argument('--rl_num_eval_img', type=int, default=5000,
-                        help='number of images to be sampled in order to get the reward')
     parser.add_argument('--num_candidate', type=int, default=10,
                         help='number of candidate architectures to be sampled')
     parser.add_argument('--topk', type=int, default=5,
@@ -211,7 +208,7 @@ def parse_args():
                         help='the vector of a discovered architecture')
     parser.add_argument('--optimizer', type=str, default="adam",
                         help='optimizer')
-    parser.add_argument('--loss', type=str, default="hinge",
+    parser.add_argument('--loss', type=str, default="standard",
                         help='loss function')
     parser.add_argument('--n_classes', type=int, default=0,
                         help='classes')
@@ -263,8 +260,10 @@ def parse_args():
                     help='show')
     parser.add_argument('--eval_epochs', type=int, default=20,
                         help='The evaluation epoch for generated data and save the generated samples')
-    parser.add_argument('--eval_num', type=int, default=100,
+    parser.add_argument('--eval_num', type=int, default=400,
                        help='The evaluation number of noise for generated data and save the generated samples')
+    parser.add_argument('--swell_ratio', type = float, default=1.3,
+                        help='visulizationMetrics: the ratio that enlarge the size of figure, eg, x_min * swell_ratio')
     opt = parser.parse_args()
 
     return opt

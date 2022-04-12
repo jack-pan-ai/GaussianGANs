@@ -12,16 +12,19 @@ def clones(module, N):
 
 class Generator(nn.Module):
     def __init__(self,
+                 x_fixed,
                  seq_len = 150,
                  channels = 3,
                  num_heads = 5, # num_head must be integer factor for seq_len
                  noise_dim = 20,  # the number of noise dimensions in the input for generator
                  depth = 4,  # the number of depth for transformer blocks
+                 # the fixed input for generator
                  ):
         super(Generator, self).__init__()
         self.channels = channels
         self.seq_len = seq_len # the sequence length of the whole time series
         self.depth = depth
+        self.x_fixed = x_fixed
 
         # model definition
         self.fc = FC(noise_dim=noise_dim, channels=channels, seq_len=seq_len)
@@ -30,8 +33,7 @@ class Generator(nn.Module):
 
     def forward(self, z):
         w = self.fc(z) # the latent space [batch_size, channels, seq]
-        x = torch.randn(w.shape, device = 'cuda')
-        x = self.transformerSynthesis(x, w) # [batch_size, channels, seq]
+        x = self.transformerSynthesis(self.x_fixed, w)  # [batch_size, channels, seq]
         x = self.l1(x)
         return x
 
@@ -254,7 +256,7 @@ class TransformerDecoderblock_discriminator(nn.Module):
         return x
 
 class ClassificationHead(nn.Sequential):
-    def __init__(self, emb_size=100, n_classes=2):
+    def __init__(self, emb_size, n_classes):
         super().__init__()
         self.clshead = nn.Sequential(
             Reduce('b n e -> b e', reduction='mean'),
@@ -263,7 +265,8 @@ class ClassificationHead(nn.Sequential):
         )
 
     def forward(self, x):
-        out = self.clshead(x)
+        x = self.clshead(x)
+        out = torch.sigmoid(x)
         return out
 
 if __name__ == '__main__':
