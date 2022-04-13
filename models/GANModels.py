@@ -12,7 +12,7 @@ def clones(module, N):
 
 class Generator(nn.Module):
     def __init__(self,
-                 x_fixed,
+                 args,
                  seq_len = 150,
                  channels = 3,
                  num_heads = 5, # num_head must be integer factor for seq_len
@@ -24,7 +24,7 @@ class Generator(nn.Module):
         self.channels = channels
         self.seq_len = seq_len # the sequence length of the whole time series
         self.depth = depth
-        self.x_fixed = x_fixed
+        self.args = args
 
         # model definition
         self.fc = FC(noise_dim=noise_dim, channels=channels, seq_len=seq_len)
@@ -33,7 +33,11 @@ class Generator(nn.Module):
 
     def forward(self, z):
         w = self.fc(z) # the latent space [batch_size, channels, seq]
-        x = self.transformerSynthesis(self.x_fixed, w)  # [batch_size, channels, seq]
+        if self.args.gpu is not None:
+            x = torch.randn(w.shape).cuda(self.args.gpu)
+        else:
+            x = torch.randn(w.shape).cuda()
+        x = self.transformerSynthesis(x, w)  # [batch_size, channels, seq]
         x = self.l1(x)
         return x
 

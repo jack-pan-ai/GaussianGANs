@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project version="4">
+  <component name="WebServers">
+    <option name="servers">
+      <webServer id="3c55c188-22d9-400c-b88e-53152f8f0655" name="peacock">
+        <fileTransfer rootFolder="/home/panq" accessType="SFTP" host="10.68.170.170" port="22" sshConfigId="47393e10-89d2-4694-80fc-8de738c22b54" sshConfig="panq@10.68.170.170:22 agent" authAgent="true">
+          <advancedOptions>
+            <advancedOptions dataProtectionLevel="Private" passiveMode="true" shareSSLContext="true" />
+          </advancedOptions>
+        </fileTransfer>
+      </webServer>
+    </option>
+  </component>
+</project>

@@ -1,11 +1,18 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <project version="4">
-  <component name="PublishConfigData" autoUpload="Always" serverName="panq@peacock (3)" deleteMissingItems="true" createEmptyFolders="true" remoteFilesAllowedToDisappearOnAutoupload="false" autoUploadExternalChanges="true">
+  <component name="PublishConfigData" autoUpload="Always" serverName="panq@10.68.170.170:22 agent" deleteMissingItems="true" createEmptyFolders="true" remoteFilesAllowedToDisappearOnAutoupload="false" autoUploadExternalChanges="true">
     <serverData>
-      <paths name="panq@peacock (3)">
+      <paths name="panq@10.68.170.170:22 agent">
         <serverdata>
           <mappings>
-            <mapping deploy="/home/panq/python_project/transformer-gan" local="$PROJECT_DIR$" web="/" />
+            <mapping deploy="/home/panq/python_project/transformer-gan" local="$PROJECT_DIR$" />
+          </mappings>
+        </serverdata>
+      </paths>
+      <paths name="peacock">
+        <serverdata>
+          <mappings>
+            <mapping deploy="/python_project/transformer-gan" local="$PROJECT_DIR$" web="/" />
           </mappings>
         </serverdata>
       </paths>

@@ -180,8 +180,7 @@ def train(args, gen_net: nn.Module, dis_net: nn.Module, gen_optimizer, dis_optim
             writer.add_scalar('g_loss', g_loss.item(), global_steps//args.n_critic) if args.rank == 0 else 0
             gen_step += 1
             writer.add_scalar('Generator fake validity', fake_validity.mean().item(), global_steps//args.n_critic) if args.rank == 0 else 0
-            wandb.log({"Generator loss per iteration": g_loss.item(),
-                       "Generator fake validity": fake_validity.mean().item()})
+            wandb.log({"Generator loss per iteration": g_loss.item()})
             g_loss_sum = g_loss_sum + g_loss
             wandb.log({"Sum of Generator loss per epoch": g_loss_sum.item()})
 

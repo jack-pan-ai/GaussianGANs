@@ -132,11 +132,7 @@ def main_worker(gpu, ngpus_per_node, args):
         print('The heads of  in transformer should be divisibke by the length of sequence of length, such as: seq_len = integer * heads ')
         raise ValueError
     # import network
-    if args.gpu is not None:
-        x_fixed = torch.randn([1, channels, seq_len]).cuda(args.gpu)
-    else:
-        x_fixed = torch.randn([1, channels, seq_len], device = 'cuda')
-    gen_net = Generator(x_fixed=x_fixed,
+    gen_net = Generator(args=args,
                         seq_len=seq_len, channels=channels,
                         num_heads= args.heads,noise_dim=args.noise_dim,
                         depth=args.g_depth)
@@ -262,7 +258,8 @@ def main_worker(gpu, ngpus_per_node, args):
     print('------------------------------------------------------------')
 
     # wandb ai monitoring
-    wandb.init(project=args.exp_name, entity="qilong77")
+    project_name = 'loss: ' + args.loss + ', n: ' + str(args.n_critic)
+    wandb.init(project=args.exp_name, entity="qilong77", name = project_name)
     wandb.config = {
         "epochs": int(args.epochs) - int(start_epoch),
         "batch_size": args.batch_size
