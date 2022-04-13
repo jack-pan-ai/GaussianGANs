@@ -12,28 +12,32 @@ def clones(module, N):
 
 class Generator(nn.Module):
     def __init__(self,
-                 x_fixed,
                  seq_len = 150,
                  channels = 3,
                  num_heads = 5, # num_head must be integer factor for seq_len
                  noise_dim = 20,  # the number of noise dimensions in the input for generator
                  depth = 4,  # the number of depth for transformer blocks
-                 # the fixed input for generator
-                 ):
+                 args = None
+                ):
         super(Generator, self).__init__()
         self.channels = channels
         self.seq_len = seq_len # the sequence length of the whole time series
         self.depth = depth
-        self.x_fixed = x_fixed
 
         # model definition
         self.fc = FC(noise_dim=noise_dim, channels=channels, seq_len=seq_len)
         self.transformerSynthesis = TransformerSynthesis_generator(depth=depth, seq_len = seq_len, num_heads = num_heads)
         self.l1 = nn.Linear(in_features=seq_len, out_features=seq_len)
+        self.args = args
 
     def forward(self, z):
         w = self.fc(z) # the latent space [batch_size, channels, seq]
-        x = self.transformerSynthesis(self.x_fixed, w)  # [batch_size, channels, seq]
+        batch_size, channels, seq_len = w.shape
+        if self.args.gpu is not None:
+            x = torch.randn([1, channels, seq_len]).cuda(self.args.gpu)
+        else:
+            x = torch.randn([1, channels, seq_len], device='cuda')
+        x = self.transformerSynthesis(x, w)  # [batch_size, channels, seq]
         x = self.l1(x)
         return x
 
