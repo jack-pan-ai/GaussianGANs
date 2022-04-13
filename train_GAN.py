@@ -132,7 +132,8 @@ def main_worker(gpu, ngpus_per_node, args):
         print('The heads of  in transformer should be divisibke by the length of sequence of length, such as: seq_len = integer * heads ')
         raise ValueError
     # import network
-    gen_net = Generator(seq_len=seq_len, channels=channels,
+    gen_net = Generator(args=args,
+                        seq_len=seq_len, channels=channels,
                         num_heads= args.heads,noise_dim=args.noise_dim,
                         depth=args.g_depth,
                         args=args)
@@ -258,8 +259,8 @@ def main_worker(gpu, ngpus_per_node, args):
     print('------------------------------------------------------------')
 
     # wandb ai monitoring
-    display_name = 'loss: ' + args.loss + 'n_critic: ' + str(args.n_critic)
-    wandb.init(project=args.exp_name, entity="qilong77", name = display_name)
+    project_name = 'loss: ' + args.loss + ', n: ' + str(args.n_critic)
+    wandb.init(project=args.exp_name, entity="qilong77", name = project_name)
     wandb.config = {
         "epochs": int(args.epochs) - int(start_epoch),
         "batch_size": args.batch_size
