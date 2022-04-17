@@ -168,7 +168,6 @@ class ClassificationHead(nn.Sequential):
         out = self.clshead(x)
         return out
 
-
 class PatchEmbedding_Linear(nn.Module):
     # what are the proper parameters set here?
     def __init__(self, in_channels, patch_size, emb_size, seq_length):
@@ -222,3 +221,4 @@ if __name__ == "__main__":
     dis = Discriminator(seq_len = 150, channels =3, depth=4, num_heads=5)
     out_gen = dis(torch.randn(128, 3, 150))
     print(out_gen.shape)
+
