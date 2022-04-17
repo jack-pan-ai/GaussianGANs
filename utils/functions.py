@@ -4,6 +4,7 @@
 # @Version : 0.0
 # @Link    : None
 ## @ revised : 2022-04-07
+
 ## @ Author: Qilong Pan (qilong.pan@kaust.edu.sa)
 ## @ Version: 0.0
 ## @ link: jack-pan-ai.github.com
@@ -129,8 +130,8 @@ def train(args, gen_net: nn.Module, dis_net: nn.Module, gen_optimizer, dis_optim
                 if args.loss == "standard":
                     # -log(D(G(z)))
                     fake_validity = fake_validity.view(-1)
-                    g_loss = - torch.log(fake_validity)
-                if args.loss == "lsgan":
+                    g_loss = - torch.sum(torch.log(fake_validity))
+                elif args.loss == "lsgan":
                     real_label = torch.full((fake_validity.shape[0],), 1., dtype=torch.float, device=real_imgs.get_device())
                     g_loss = nn.MSELoss()(fake_validity.view(-1), real_label)
                 elif args.loss == 'wgangp-mode':

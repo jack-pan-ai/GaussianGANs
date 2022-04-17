@@ -240,7 +240,7 @@ def parse_args():
                         help='number of heads')
     parser.add_argument('--ema', type=float, default=0.995,
                         help='ema')
-    parser.add_argument('--ema_warmup', type=float, default=0.,
+    parser.add_argument('--ema_warmup', type=float, default=0.1,
                         help='ema warm up')
     parser.add_argument('--ema_kimg', type=int, default=500,
                         help='ema thousand images')

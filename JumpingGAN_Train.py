@@ -27,14 +27,12 @@ os.system(f"CUDA_VISIBLE_DEVICES=0,1,2,3,4,5,6,7 python train_GAN.py \
 --num_workers 16 \
 --g_lr 0.0001 \
 --d_lr 0.0003 \
---loss wgangp \
+--loss lsgan \
+--n_critic 2 \
 --phi 1 \
 --epochs 10000 \
 --batch_size 16 \
 --print_freq 50 \
---ema_kimg 500 \
---ema_warmup 0.1 \
---ema 0.9999 \
 --diff_aug translation,cutout,color \
 --class_name Jumping \
 --exp_name Jumping")

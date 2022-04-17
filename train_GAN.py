@@ -132,9 +132,8 @@ def main_worker(gpu, ngpus_per_node, args):
         print('The heads of  in transformer should be divisibke by the length of sequence of length, such as: seq_len = integer * heads ')
         raise ValueError
     # import network
-    gen_net = Generator(args=args,
-                        seq_len=seq_len, channels=channels,
-                        num_heads= args.heads,noise_dim=args.noise_dim,
+    gen_net = Generator(seq_len=seq_len, channels=channels,
+                        num_heads= args.heads, latent_dim=args.noise_dim,
                         depth=args.g_depth)
     dis_net = Discriminator(seq_len=seq_len, channels=channels,
                             num_heads=args.heads, depth=args.d_depth)
@@ -274,7 +273,7 @@ def main_worker(gpu, ngpus_per_node, args):
 
         # save the generated time series after using PCA and t-SNE
         if args.rank == 0 or args.show:
-            if (epoch) % args.eval_epochs ==0 :
+            if (epoch) % args.eval_epochs == 0:
                 #backup_param = copy_params(gen_net)
                 #load_params(gen_net, gen_avg_param, args, mode="cpu")
                 sample_imgs = save_samples(args, fixed_z, epoch + 1, gen_net, writer_dict)
