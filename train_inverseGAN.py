@@ -4,16 +4,16 @@ from __future__ import print_function
 
 from config import cfg
 from dataset.UniMiB.dataLoader import *
-from models.GANModels import *
-from utils.functions import train, save_samples, LinearLrDecay, load_params, copy_params
+from models.inverseGANModels import *
+from utils.functions import inverse_train, save_samples, LinearLrDecay, load_params, copy_params
 from utils.utils import set_log_dir, save_checkpoint, create_logger
 from utils.visualizationMetrics import visualization
+from dataset.MultiNormal.multi_normal_generate import MultiNormaldataset
 
 import torch
 import torch.multiprocessing as mp
 import torch.distributed as dist
 import torch.utils.data.distributed
-from torch.utils import data
 import os
 import numpy as np
 import torch.nn as nn
@@ -24,33 +24,32 @@ import matplotlib.pyplot as plt
 from torchinfo import summary
 from einops import rearrange
 
-
 # synthesis data
 import warnings
 import wandb
+
 
 # torch.backends.cudnn.enabled = True
 # torch.backends.cudnn.benchmark = True
 
 
-
 def main():
     args = cfg.parse_args()
-    
+
     if args.seed is not None:
         # reproduce the results
         torch.manual_seed(args.seed)
         torch.cuda.manual_seed_all(args.seed)
         np.random.seed(args.seed)
         random.seed(args.seed)
-        torch.backends.cudnn.benchmark = False # the accelerator for CNN computation
+        torch.backends.cudnn.benchmark = False  # the accelerator for CNN computation
         torch.backends.cudnn.deterministic = True
 
     if args.gpu is not None:
         warnings.warn('You have chosen a specific GPU. This will completely disable data parallelism.')
 
     if args.dist_url == "env://" and args.world_size == -1:
-         args.world_size = int(os.environ["WORLD_SIZE"])#
+        args.world_size = int(os.environ["WORLD_SIZE"])  #
 
     args.distributed = args.world_size > 1 or args.multiprocessing_distributed
 
@@ -65,10 +64,11 @@ def main():
     else:
         # Simply call main_worker function
         main_worker(args.gpu, ngpus_per_node, args)
-        
+
+
 def main_worker(gpu, ngpus_per_node, args):
     args.gpu = gpu
-    
+
     if args.gpu is not None:
         print("Use GPU: {} for training".format(args.gpu))
 
@@ -81,6 +81,7 @@ def main_worker(gpu, ngpus_per_node, args):
             args.rank = args.rank * ngpus_per_node + gpu
         dist.init_process_group(backend=args.dist_backend, init_method=args.dist_url,
                                 world_size=args.world_size, rank=args.rank)
+
     # weight init
     def weights_init(m):
         classname = m.__class__.__name__
@@ -93,15 +94,15 @@ def main_worker(gpu, ngpus_per_node, args):
                 nn.init.xavier_uniform(m.weight.data, 1.)
             else:
                 raise NotImplementedError('{} unknown inital type'.format(args.init_type))
-#         elif classname.find('Linear') != -1:
-#             if args.init_type == 'normal':
-#                 nn.init.normal_(m.weight.data, 0.0, 0.02)
-#             elif args.init_type == 'orth':
-#                 nn.init.orthogonal_(m.weight.data)
-#             elif args.init_type == 'xavier_uniform':
-#                 nn.init.xavier_uniform(m.weight.data, 1.)
-#             else:
-#                 raise NotImplementedError('{} unknown inital type'.format(args.init_type))
+        #         elif classname.find('Linear') != -1:
+        #             if args.init_type == 'normal':
+        #                 nn.init.normal_(m.weight.data, 0.0, 0.02)
+        #             elif args.init_type == 'orth':
+        #                 nn.init.orthogonal_(m.weight.data)
+        #             elif args.init_type == 'xavier_uniform':
+        #                 nn.init.xavier_uniform(m.weight.data, 1.)
+        #             else:
+        #                 raise NotImplementedError('{} unknown inital type'.format(args.init_type))
         elif classname.find('BatchNorm2d') != -1:
             nn.init.normal_(m.weight.data, 1.0, 0.02)
             nn.init.constant_(m.bias.data, 0.0)
@@ -111,31 +112,33 @@ def main_worker(gpu, ngpus_per_node, args):
     print('Data Loadering ~ Wait ~')
     print('------------------------------------------------------------')
 
-    # train_set = VTSDataset(set_type = 'train')
-    # test_set = TSDataset(set_type = 'test')
+    # [batch_size, latent dim]
+    train_set = MultiNormaldataset(latent_dim=args.noise_dim, size=10000, mode='train')
+    train_loader = DataLoader(train_set, batch_size=args.batch_size, num_workers=args.num_workers, shuffle=True)
+    #test_set = MultiNormaldataset(latent_dim=args.noise_dim, size = 1000, mode='test')
+    #test_loader = DataLoader(test_set, batch_size=args.batch_size, num_workers=args.num_workers, shuffle=True)
+
     # [batch_size, channles, seq-len]
-    train_set = unimib_load_dataset(incl_xyz_accel=True, incl_rms_accel=False, incl_val_group=False, is_normalize=True,
+    print('------------------------------------------------------------')
+    print('--------------------UniMiB Dataset--------------------------')
+    img_set = unimib_load_dataset(incl_xyz_accel=True, incl_rms_accel=False, incl_val_group=False, is_normalize=True,
                                     one_hot_encode=False, data_mode='Train', single_class=True,
                                     class_name=args.class_name, augment_times=args.augment_times)
-    train_loader = data.DataLoader(train_set, batch_size=args.batch_size, num_workers=args.num_workers, shuffle=True)
-    test_set = unimib_load_dataset(incl_xyz_accel=True, incl_rms_accel=False, incl_val_group=False, is_normalize=True,
-                                   one_hot_encode=False, data_mode='Test', single_class=True,
-                                   class_name=args.class_name)
-    test_loader = data.DataLoader(test_set, batch_size=args.batch_size, num_workers=args.num_workers, shuffle=True)
     print('------------------------------------------------------------')
     print('How many iterations in a training epoch: ', len(train_loader))
     print('------------------------------------------------------------')
     assert len(train_set) >= args.eval_num, 'The number of evaluation should be less than test_set'
 
-    channels, seq_len = train_set[1].shape
+    gen_channels, gen_seq_len = img_set[1].shape
     # import network
-    gen_net = Generator(seq_len=seq_len, channels=channels,
-                        num_heads= args.heads, latent_dim=args.noise_dim,
+    gen_net = inverseGenerator(seq_len=gen_seq_len, channels=gen_channels,
+                        num_heads=args.heads, latent_dim=args.noise_dim,
                         depth=args.g_depth, patch_size=args.patch_size)
-    dis_net = Discriminator(seq_len=seq_len, channels=channels,
-                            num_heads=args.heads, depth=args.d_depth,
-                            patch_size=args.patch_size)
-    #print(dis_net)
+    dis_channels, dis_seq_len = train_set[1].shape
+    dis_net = inverseDiscriminator(seq_len=dis_seq_len, channels=dis_channels,
+                            num_heads=args.heads, depth=args.d_depth)
+                            #patch_size=args.patch_size)
+    # print(dis_net)
     print('------------------------------------------------------------')
     print('Copy Gen/Dis networks to gpu')
     print('------------------------------------------------------------')
@@ -147,8 +150,8 @@ def main_worker(gpu, ngpus_per_node, args):
         # DistributedDataParallel will use all available devices.
         if args.gpu is not None:
             torch.cuda.set_device(args.gpu)
-#             gen_net = eval('models_search.'+args.gen_model+'.Generator')(args=args)
-#             dis_net = eval('models_search.'+args.dis_model+'.Discriminator')(args=args)
+            #             gen_net = eval('models_search.'+args.gen_model+'.Generator')(args=args)
+            #             dis_net = eval('models_search.'+args.dis_model+'.Discriminator')(args=args)
 
             gen_net.apply(weights_init)
             dis_net.apply(weights_init)
@@ -160,10 +163,12 @@ def main_worker(gpu, ngpus_per_node, args):
             args.dis_batch_size = int(args.dis_batch_size / ngpus_per_node)
             args.gen_batch_size = int(args.gen_batch_size / ngpus_per_node)
             args.batch_size = args.dis_batch_size
-            
+
             args.num_workers = int((args.num_workers + ngpus_per_node - 1) / ngpus_per_node)
-            gen_net = torch.nn.parallel.DistributedDataParallel(gen_net, device_ids=[args.gpu], find_unused_parameters=True)
-            dis_net = torch.nn.parallel.DistributedDataParallel(dis_net, device_ids=[args.gpu], find_unused_parameters=True)
+            gen_net = torch.nn.parallel.DistributedDataParallel(gen_net, device_ids=[args.gpu],
+                                                                find_unused_parameters=True)
+            dis_net = torch.nn.parallel.DistributedDataParallel(dis_net, device_ids=[args.gpu],
+                                                                find_unused_parameters=True)
         else:
             gen_net.cuda()
             dis_net.cuda()
@@ -185,21 +190,20 @@ def main_worker(gpu, ngpus_per_node, args):
     print('------------------------------------------------------------')
 
     # model size for generator
-    summary(gen_net, (args.batch_size, args.noise_dim))
+    summary(gen_net, (args.batch_size, gen_channels, gen_seq_len))
 
     # set optimizer
     if args.optimizer == "adam":
         gen_optimizer = torch.optim.Adam(filter(lambda p: p.requires_grad, gen_net.parameters()),
-                                        args.g_lr, (args.beta1, args.beta2), weight_decay=args.wd)
+                                         args.g_lr, (args.beta1, args.beta2), weight_decay=args.wd)
         dis_optimizer = torch.optim.Adam(filter(lambda p: p.requires_grad, dis_net.parameters()),
-                                        args.d_lr, (args.beta1, args.beta2), weight_decay=args.wd)
+                                         args.d_lr, (args.beta1, args.beta2), weight_decay=args.wd)
     else:
         '''
         TO DO: add other optimizer
         '''
         pass
 
-        
     gen_scheduler = LinearLrDecay(gen_optimizer, args.g_lr, 0.0, 0, args.max_iter * args.n_critic)
     dis_scheduler = LinearLrDecay(dis_optimizer, args.d_lr, 0.0, 0, args.max_iter * args.n_critic)
 
@@ -208,7 +212,6 @@ def main_worker(gpu, ngpus_per_node, args):
     gen_avg_param = copy_params(avg_gen_net)
     del avg_gen_net
     start_epoch = 0
-    fixed_z = torch.cuda.FloatTensor(np.random.normal(0, 1, (args.eval_num, args.noise_dim)))
 
     # set writer
     writer = None
@@ -224,11 +227,10 @@ def main_worker(gpu, ngpus_per_node, args):
         dis_net.load_state_dict(checkpoint['dis_state_dict'])
         gen_optimizer.load_state_dict(checkpoint['gen_optimizer'])
         dis_optimizer.load_state_dict(checkpoint['dis_optimizer'])
-        
+
         gen_net.load_state_dict(checkpoint['avg_gen_state_dict'])
         gen_avg_param = copy_params(gen_net, mode='gpu')
         gen_net.load_state_dict(checkpoint['gen_state_dict'])
-        fixed_z = checkpoint['fixed_z']
 
         args.path_helper = checkpoint['path_helper']
         logger = create_logger(args.path_helper['log_path']) if args.rank == 0 else None
@@ -236,13 +238,13 @@ def main_worker(gpu, ngpus_per_node, args):
         writer = SummaryWriter(args.path_helper['log_path']) if args.rank == 0 else None
         del checkpoint
     else:
-    # create new log dir
+        # create new log dir
         assert args.exp_name
         if args.rank == 0:
             args.path_helper = set_log_dir('logs', args.exp_name)
             logger = create_logger(args.path_helper['log_path'])
             writer = SummaryWriter(args.path_helper['log_path'])
-    
+
     if args.rank == 0:
         logger.info(args)
     writer_dict = {
@@ -256,7 +258,7 @@ def main_worker(gpu, ngpus_per_node, args):
 
     # wandb ai monitoring
     project_name = 'loss: ' + args.loss + ', n: ' + str(args.n_critic)
-    wandb.init(project=args.exp_name, entity="qilong77", name = project_name)
+    wandb.init(project=args.exp_name, entity="qilong77", name=project_name)
     wandb.config = {
         "epochs": int(args.epochs) - int(start_epoch),
         "batch_size": args.batch_size
@@ -265,23 +267,26 @@ def main_worker(gpu, ngpus_per_node, args):
     # train loop
     for epoch in range(int(start_epoch), int(args.epochs)):
         lr_schedulers = (gen_scheduler, dis_scheduler) if args.lr_decay else None
-        train(args, gen_net, dis_net, gen_optimizer, dis_optimizer, gen_avg_param,
-              train_loader, epoch, writer_dict, lr_schedulers)
+        inverse_train(args, gen_net, dis_net, gen_optimizer, dis_optimizer, gen_avg_param,
+              train_loader, epoch, writer_dict, img_set, lr_schedulers)
 
         # save the generated time series after using PCA and t-SNE
         if args.rank == 0 or args.show:
             if (epoch) % args.eval_epochs == 0:
-                #backup_param = copy_params(gen_net)
-                #load_params(gen_net, gen_avg_param, args, mode="cpu")
-                sample_imgs = save_samples(args, fixed_z, epoch + 1, gen_net, writer_dict)
-                #load_params(gen_net, backup_param, args)
+                # backup_param = copy_params(gen_net)
+                # load_params(gen_net, gen_avg_param, args, mode="cpu")
+                # load_params(gen_net, backup_param, args)
                 # plot the generated data for every 5 epoch
+                with torch.no_grad():
+                    imgs_s = torch.from_numpy(img_set[:args.eval_num]).type(torch.cuda.FloatTensor).cuda(args.gpu)
+                    sample_imgs = gen_net(imgs_s).detach().to('cpu')
                 visualization(ori_data=train_set[:args.eval_num], generated_data=sample_imgs, analysis='pca',
-                              save_name=args.exp_name, epoch=epoch, args = args)
-                image = plt.imread(os.path.join(args.path_helper['log_path_img'],f'{args.exp_name}_epoch_{epoch+1}.png'))
+                              save_name=args.exp_name, epoch=epoch, args=args)
+                image = plt.imread(
+                    os.path.join(args.path_helper['log_path_img'], f'{args.exp_name}_epoch_{epoch + 1}.png'))
                 image = rearrange(image, 'h w c -> c h w')
                 writer.add_image('Comparison for original and generative data based on PCA', image, epoch + 1)
-        
+
         is_best = False
         avg_gen_net = deepcopy(gen_net)
         load_params(avg_gen_net, gen_avg_param, args)
@@ -295,12 +300,12 @@ def main_worker(gpu, ngpus_per_node, args):
             'gen_optimizer': gen_optimizer.state_dict(),
             'dis_optimizer': dis_optimizer.state_dict(),
             'path_helper': args.path_helper,
-            'fixed_z': fixed_z
         }, is_best, args.path_helper['ckpt_path'], filename="checkpoint")
         del avg_gen_net
 
     print('===============================================')
-    print('Training Finished & Model Saved, the path is: ', args.path_helper['ckpt_path']+ '/'+ 'checkpoint')
+    print('Training Finished & Model Saved, the path is: ', args.path_helper['ckpt_path'] + '/' + 'checkpoint')
+
 
 if __name__ == '__main__':
     main()

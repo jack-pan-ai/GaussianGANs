@@ -8,11 +8,11 @@ from einops import rearrange, reduce, repeat
 from einops.layers.torch import Rearrange, Reduce
 
 
-class Generator(nn.Module):
+class inverseGenerator(nn.Module):
     def __init__(self, seq_len,  channels, num_heads, latent_dim, depth,
-                 patch_size=15, embed_dim=10,
+                 patch_size, embed_dim=10,
                  forward_drop_rate=0.5, attn_drop_rate=0.5):
-        super(Generator, self).__init__()
+        super(inverseGenerator, self).__init__()
         self.channels = channels
         self.latent_dim = latent_dim
         self.seq_len = seq_len
@@ -23,8 +23,8 @@ class Generator(nn.Module):
         self.attn_drop_rate = attn_drop_rate
         self.forward_drop_rate = forward_drop_rate
 
-        self.l1 = nn.Linear(self.latent_dim, self.seq_len * self.embed_dim)
-        self.pos_embed = nn.Parameter(torch.zeros(1, self.seq_len, self.embed_dim))
+        self.l1 = nn.Linear(self.seq_len * self.embed_dim, self.latent_dim)
+        self.pos_embed = nn.Parameter(torch.zeros(1, self.channels, self.seq_len))
         self.blocks = Gen_TransformerEncoder(
             depth=self.depth,
             num_heads = self.num_heads,
@@ -33,18 +33,20 @@ class Generator(nn.Module):
             forward_drop_p=self.forward_drop_rate
         )
 
-        self.deconv = nn.Sequential(
-            nn.Conv2d(self.embed_dim, self.channels, 1)
+        self.reconv = nn.Sequential(
+            nn.Conv2d(self.channels, self.embed_dim, 1)
         )
 
     def forward(self, z):
-        x = self.l1(z).view(-1, self.seq_len, self.embed_dim) # [batch_size, latent_dim] -> [batch_size, seq_len, embed_dim]
-        x = x + self.pos_embed
-        x = self.blocks(x) # [batch_size, seq_len, embed_dim] -> [batch_size, seq_len, embed_dim]
-        x = x.reshape(x.shape[0], 1, x.shape[1], x.shape[2])
-        output = self.deconv(x.permute(0, 3, 1, 2))
-        output = output.view(-1, self.channels, self.seq_len)
-        return output
+        z = z + self.pos_embed
+        z = z.unsqueeze(2) # [batch_size, channels, seq_len] -> [batch_size, channels, 1, seq_len]
+        z = self.reconv(z)  # [batch_size, channels, 1, seq_len] -> [batch_size, embed_dim, 1, seq_len]
+        z = z.squeeze(2)  # [batch_size, embed_dim, 1, seq_len] -> [batch_size, embed_dim, seq_len]
+        z = rearrange(z, 'b e s -> b s e')
+        z = self.blocks(z).view(-1, self.embed_dim * self.seq_len) # [batch_size, embed_dim, seq_len] -> [batch_size, embed_dim * seq_len]
+        z = self.l1(z).unsqueeze(1) # [batch_size, embed_dim * seq_len] -> [batch_size, 1, latent_dim]
+
+        return z
 
 
 class Gen_TransformerEncoderBlock(nn.Sequential):
@@ -191,17 +193,17 @@ class PatchEmbedding_Linear(nn.Module):
         return x
 
 
-class Discriminator(nn.Sequential):
+class inverseDiscriminator(nn.Sequential):
     def __init__(self,
                  seq_len,
                  channels,
                  depth,
-                 num_heads,
-                 patch_size=15,
+                 patch_size=8,
+                 num_heads=5, # num_head * integer = emb_size
                  emb_size=50,
                  n_classes=1,
                  **kwargs):
-        super().__init__(
+        super(inverseDiscriminator, self).__init__(
             # [batch_size, channels, seq_len] -> [batch_size, patch_num + 1, channels*patch_size]
             PatchEmbedding_Linear(in_channels=channels, patch_size=patch_size,
                                   emb_size=emb_size, seq_length=seq_len),
@@ -214,10 +216,10 @@ class Discriminator(nn.Sequential):
         )
 
 if __name__ == "__main__":
-    gen = Generator(seq_len = 150,  channels=3, num_heads=5, latent_dim=64, depth=4)
-    out_gen = gen(torch.randn(128, 64))
+    gen = inverseGenerator(seq_len = 150,  channels=3, num_heads=5, latent_dim=64, depth=4, patch_size=15)
+    out_gen = gen(torch.randn(128, 3, 150))
     print(out_gen.shape)
-    dis = Discriminator(seq_len = 150, channels =3, depth=4, num_heads=5)
-    out_gen = dis(torch.randn(128, 3, 150))
+    dis = inverseDiscriminator(seq_len = 64, channels =1, depth=4, patch_size=8)
+    out_gen = dis(torch.randn(128, 1 ,64))
     print(out_gen.shape)
 

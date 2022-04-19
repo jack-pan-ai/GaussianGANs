@@ -20,10 +20,11 @@ def parse_args():
     parser = argparse.ArgumentParser()
     parser.add_argument('--world-size', default=-1, type=int,
                     help='number of nodes for distributed training')
-    parser.add_argument('--rank', default=-1, type=int,
+    parser.add_argument('--rank', default=0, type=int,
                         help='node rank for distributed training')
     parser.add_argument('--loca_rank', default=-1, type=int,
                         help='node rank for distributed training')
+    parser.add_argument('--node', type=str, default="0015")
     parser.add_argument('--dist-url', default='tcp://224.66.41.62:23456', type=str,
                         help='url used to set up distributed training')
     parser.add_argument('--dist-backend', default='nccl', type=str,
@@ -98,10 +99,10 @@ def parse_args():
         default=32,
         help='dimensionality of the noise space')
     parser.add_argument(
-        '--channels',
+        '--patch_size',
         type=int,
-        default=3,
-        help='number of image channels')
+        default=15,
+        help='number of patch size should be integer factor for seq_length')
     parser.add_argument(
         '--n_critic',
         type=int,
@@ -171,11 +172,6 @@ def parse_args():
         default='controller',
         help='path of controller')
     parser.add_argument('--eval_batch_size', type=int, default=100)
-    parser.add_argument(
-        '--bottom_width',
-        type=int,
-        default=4,
-        help="the base resolution of the GAN")
 
     # search
     parser.add_argument('--shared_epoch', type=int, default=15,
@@ -186,10 +182,6 @@ def parse_args():
                         help='which iteration to grow the image size from 16 to 32')
     parser.add_argument('--max_search_iter', type=int, default=90,
                         help='max search iterations of this algorithm')
-    parser.add_argument('--ctrl_step', type=int, default=30,
-                        help='number of steps to train the controller at each search iteration')
-    parser.add_argument('--ctrl_sample_batch', type=int, default=1,
-                        help='sample size of controller of each step')
     parser.add_argument('--hid_size', type=int, default=100,
                         help='the size of hidden vector')
     parser.add_argument('--baseline_decay', type=float, default=0.9,
@@ -228,8 +220,6 @@ def parse_args():
                         help='Generator activation Layer')
     parser.add_argument('--d_act', type=str, default="gelu",
                         help='Discriminator activation layer')
-    parser.add_argument('--diff_aug', type=str, default="None",
-                        help='differentiable augmentation type')
     parser.add_argument('--accumulated_times', type=int, default=1,
                         help='gradient accumulation')
     parser.add_argument('--g_accumulated_times', type=int, default=1,
