@@ -200,6 +200,17 @@ def save_checkpoint(states, is_best, output_dir,
     if is_best:
         torch.save(states, os.path.join(output_dir, 'checkpoint_best.pth'))
 
+def load_checkpoint(net, checkpoint_PATH, optimizer=None):
+    cwd = os.getcwd()
+    CKPT_PATH = os.path.join(cwd, checkpoint_PATH)
+    if CKPT_PATH is not None:
+        print('loading checkpoint!')
+        CKPT = torch.load(CKPT_PATH)
+        net.load_state_dict(CKPT['gen_state_dict'])
+        if optimizer is not None:
+            optimizer.load_state_dict(CKPT['gen_optimizer'])
+    else:
+        print('Please input the model path')
 
 class RunningStats:
     def __init__(self, WIN_SIZE):

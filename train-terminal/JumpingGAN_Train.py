@@ -12,7 +12,7 @@ os.system(f"CUDA_VISIBLE_DEVICES=0,1,2,3,4,5,6,7 python ../train_GAN.py \
 --gen_model my_gen \
 --dis_model my_dis \
 --heads 5 \
---noise_dim 65 \
+--noise_dim 64 \
 --num_workers 16 \
 --g_lr 0.0001 \
 --d_lr 0.0003 \
