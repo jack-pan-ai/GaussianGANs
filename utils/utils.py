@@ -180,11 +180,23 @@ def set_log_dir(root_dir, exp_name):
     path_dict['ckpt_path'] = ckpt_path
 
     log_path = os.path.join(prefix, 'Log')
-    log_path_img = os.path.join(log_path, 'images')
     os.makedirs(log_path)
-    os.makedirs(log_path_img)
     path_dict['log_path'] = log_path
-    path_dict['log_path_img'] = log_path_img
+
+    # image save
+    prefix_image = os.path.join(prefix, 'image')
+
+    log_path_img_pca = os.path.join(prefix_image, 'pca')
+    os.makedirs(log_path_img_pca)
+    path_dict['log_path_img_pca'] = log_path_img_pca
+
+    log_path_img_heatmap = os.path.join(prefix_image, 'heatmap')
+    os.makedirs(log_path_img_heatmap)
+    path_dict['log_path_img_heatmap'] = log_path_img_heatmap
+
+    log_path_img_qqplot = os.path.join(prefix_image, 'qqplot')
+    os.makedirs(log_path_img_qqplot)
+    path_dict['log_path_img_qqplot'] = log_path_img_qqplot
 
     # set sample image path for fid calculation
     sample_path = os.path.join(prefix, 'Samples')
@@ -194,11 +206,10 @@ def set_log_dir(root_dir, exp_name):
     return path_dict
 
 
-def save_checkpoint(states, is_best, output_dir,
+def save_checkpoint(states, output_dir,
                     filename='checkpoint.pth'):
     torch.save(states, os.path.join(output_dir, filename))
-    if is_best:
-        torch.save(states, os.path.join(output_dir, 'checkpoint_best.pth'))
+
 
 def load_checkpoint(net, checkpoint_PATH, optimizer=None):
     cwd = os.getcwd()
@@ -258,3 +269,5 @@ class RunningStats:
 
     def __str__(self):
         return "Current window values: {}".format(list(self.window))
+
+

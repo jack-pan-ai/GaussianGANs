@@ -200,8 +200,8 @@ def main_worker(gpu, ngpus_per_node, args):
         pass
 
         
-    gen_scheduler = LinearLrDecay(gen_optimizer, args.g_lr, 0.0, 0, args.max_iter * args.n_critic)
-    dis_scheduler = LinearLrDecay(dis_optimizer, args.d_lr, 0.0, 0, args.max_iter * args.n_critic)
+    gen_scheduler = LinearLrDecay(gen_optimizer, args.g_lr, 0.0, 0, args.max_iter * args.n_gen)
+    dis_scheduler = LinearLrDecay(dis_optimizer, args.d_lr, 0.0, 0, args.max_iter * args.n_dis)
 
     # initial
     avg_gen_net = deepcopy(gen_net).cpu()
@@ -255,7 +255,7 @@ def main_worker(gpu, ngpus_per_node, args):
     print('------------------------------------------------------------')
 
     # wandb ai monitoring
-    project_name = 'loss: ' + args.loss + ', n: ' + str(args.n_critic)
+    project_name = 'loss: ' + args.loss + ', n_gen: ' + str(args.n_gen) + ', n_dis: '+ str(args.n_dis)
     wandb.init(project=args.exp_name, entity="qilong77", name = project_name)
     wandb.config = {
         "epochs": int(args.epochs) - int(start_epoch),
@@ -275,10 +275,12 @@ def main_worker(gpu, ngpus_per_node, args):
                 #load_params(gen_net, gen_avg_param, args, mode="cpu")
                 sample_imgs = save_samples(args, fixed_z, epoch + 1, gen_net, writer_dict)
                 #load_params(gen_net, backup_param, args)
-                # plot the generated data for every 5 epoch
+                # evaluation the net from different perspective
                 visualization(ori_data=train_set[:args.eval_num], generated_data=sample_imgs, analysis='pca',
                               save_name=args.exp_name, epoch=epoch, args = args)
+
                 image = plt.imread(os.path.join(args.path_helper['log_path_img'],f'{args.exp_name}_epoch_{epoch+1}.png'))
+                wandb.log({'PCA plot': image})
                 image = rearrange(image, 'h w c -> c h w')
                 writer.add_image('Comparison for original and generative data based on PCA', image, epoch + 1)
         

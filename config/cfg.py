@@ -104,10 +104,15 @@ def parse_args():
         default=15,
         help='number of patch size should be integer factor for seq_length')
     parser.add_argument(
-        '--n_critic',
+        '--n_dis',
         type=int,
         default=1,
         help='number of training steps for discriminator per iter')
+    parser.add_argument(
+        '--n_gen',
+        type=int,
+        default=1,
+        help='number of training steps for generator per iter')
     parser.add_argument(
         '--val_freq',
         type=int,
@@ -248,9 +253,9 @@ def parse_args():
                         help='discriminator mlp ratio')
     parser.add_argument('--show', action='store_true',
                     help='show')
-    parser.add_argument('--eval_epochs', type=int, default=20,
+    parser.add_argument('--eval_epochs', type=int, default=10,
                         help='The evaluation epoch for generated data and save the generated samples')
-    parser.add_argument('--eval_num', type=int, default=400,
+    parser.add_argument('--eval_num', type=int, default=200,
                        help='The evaluation number of noise for generated data and save the generated samples')
     parser.add_argument('--swell_ratio', type = float, default=1.3,
                         help='visulizationMetrics: the ratio that enlarge the size of figure, eg, x_min * swell_ratio')

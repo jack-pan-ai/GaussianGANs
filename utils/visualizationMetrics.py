@@ -113,5 +113,5 @@ def visualization (ori_data, generated_data, analysis, save_name, epoch, args):
         plt.ylabel('y_tsne')
 #         plt.show()
 
-    plt.savefig(os.path.join(args.path_helper['log_path_img'],f'{save_name}_epoch_{epoch+1}.png'), format="png")
+    plt.savefig(os.path.join(args.path_helper['log_path_img_pca'],f'{save_name}_epoch_{epoch+1}.png'), format="png")
 #    plt.show()

@@ -64,43 +64,44 @@ def train(args, gen_net: nn.Module, dis_net: nn.Module, gen_optimizer, dis_optim
         # ---------------------
         #  Train Discriminator
         # ---------------------
-        real_validity = dis_net(real_imgs)
-        fake_imgs = gen_net(z).detach()
-        assert fake_imgs.size() == real_imgs.size(), f"fake_imgs.size(): {fake_imgs.size()} real_imgs.size(): {real_imgs.size()}"
-        fake_validity = dis_net(fake_imgs)
+        for _ in range(args.n_dis):
+            real_validity = dis_net(real_imgs)
+            fake_imgs = gen_net(z).detach()
+            assert fake_imgs.size() == real_imgs.size(), f"fake_imgs.size(): {fake_imgs.size()} real_imgs.size(): {real_imgs.size()}"
+            fake_validity = dis_net(fake_imgs)
 
-        if args.loss == 'standard':
-            #soft label
-            real_label = torch.full((real_validity.shape[0],), 0.9, dtype=torch.float, device=real_imgs.get_device())
-            fake_label = torch.full((fake_validity.shape[0],), 0.1, dtype=torch.float, device=real_imgs.get_device())
-            real_validity = real_validity.view(-1)
-            fake_validity = fake_validity.view(-1)
-            d_real_loss = nn.BCELoss()(real_validity, real_label)
-            d_fake_loss = nn.BCELoss()(fake_validity, fake_label)
-            d_loss = d_real_loss + d_fake_loss
-        elif args.loss == 'lsgan':
-            real_label = torch.full(real_validity.shape, 1., dtype=torch.float, device=real_imgs.get_device())
-            fake_label = torch.full(real_validity.shape, 0., dtype=torch.float, device=real_imgs.get_device())
-            d_real_loss = nn.MSELoss()(real_validity, real_label)
-            d_fake_loss = nn.MSELoss()(fake_validity, fake_label)
-            d_loss = d_real_loss + d_fake_loss
-        elif args.loss == 'wgangp':
-            gradient_penalty = compute_gradient_penalty(dis_net, real_imgs, fake_imgs.detach(), args.phi)
-            d_loss = -torch.mean(real_validity) + torch.mean(fake_validity) + gradient_penalty * 10 / (
-                    args.phi ** 2)
-        elif args.loss == 'wgangp-eps':
-            gradient_penalty = compute_gradient_penalty(dis_net, real_imgs, fake_imgs.detach(), args.phi)
-            d_loss = -torch.mean(real_validity) + torch.mean(fake_validity) + gradient_penalty * 10 / (
-                    args.phi ** 2)
-            d_loss += (torch.mean(real_validity) ** 2) * 1e-3
-        elif args.loss == 'wgangp-mode':
-            gradient_penalty = compute_gradient_penalty(dis_net, real_imgs, fake_imgs.detach(), args.phi)
-            d_loss = -torch.mean(real_validity) + torch.mean(fake_validity) + gradient_penalty * 10 / (
-                    args.phi ** 2)
-        else:
-            raise NotImplementedError(args.loss)
-        d_loss = d_loss/float(args.accumulated_times)
-        d_loss.backward()
+            if args.loss == 'standard':
+                #soft label
+                real_label = torch.full((real_validity.shape[0],), 0.9, dtype=torch.float, device=real_imgs.get_device())
+                fake_label = torch.full((fake_validity.shape[0],), 0.1, dtype=torch.float, device=real_imgs.get_device())
+                real_validity = real_validity.view(-1)
+                fake_validity = fake_validity.view(-1)
+                d_real_loss = nn.BCELoss()(real_validity, real_label)
+                d_fake_loss = nn.BCELoss()(fake_validity, fake_label)
+                d_loss = d_real_loss + d_fake_loss
+            elif args.loss == 'lsgan':
+                real_label = torch.full(real_validity.shape, 1., dtype=torch.float, device=real_imgs.get_device())
+                fake_label = torch.full(real_validity.shape, 0., dtype=torch.float, device=real_imgs.get_device())
+                d_real_loss = nn.MSELoss()(real_validity, real_label)
+                d_fake_loss = nn.MSELoss()(fake_validity, fake_label)
+                d_loss = d_real_loss + d_fake_loss
+            elif args.loss == 'wgangp':
+                gradient_penalty = compute_gradient_penalty(dis_net, real_imgs, fake_imgs.detach(), args.phi)
+                d_loss = -torch.mean(real_validity) + torch.mean(fake_validity) + gradient_penalty * 10 / (
+                        args.phi ** 2)
+            elif args.loss == 'wgangp-eps':
+                gradient_penalty = compute_gradient_penalty(dis_net, real_imgs, fake_imgs.detach(), args.phi)
+                d_loss = -torch.mean(real_validity) + torch.mean(fake_validity) + gradient_penalty * 10 / (
+                        args.phi ** 2)
+                d_loss += (torch.mean(real_validity) ** 2) * 1e-3
+            elif args.loss == 'wgangp-mode':
+                gradient_penalty = compute_gradient_penalty(dis_net, real_imgs, fake_imgs.detach(), args.phi)
+                d_loss = -torch.mean(real_validity) + torch.mean(fake_validity) + gradient_penalty * 10 / (
+                        args.phi ** 2)
+            else:
+                raise NotImplementedError(args.loss)
+            d_loss = d_loss/float(args.accumulated_times)
+            d_loss.backward()
 
         # visulize the training process for loss and validity
         if (iter_idx + 1) % args.accumulated_times == 0:
@@ -111,49 +112,49 @@ def train(args, gen_net: nn.Module, dis_net: nn.Module, gen_optimizer, dis_optim
             writer.add_scalar('Discriminator real validity', real_validity.mean().item(), global_steps) if args.rank == 0 else 0
             writer.add_scalar('Discriminator fake validity', fake_validity.mean().item(), global_steps) if args.rank == 0 else 0
             wandb.log({
-                "Discriminator Loss per iteration": d_loss.item(),
                 "Discriminator Real validity": real_validity.mean().item(),
-                "Discriminator Fake validity": fake_validity.mean().item()})
+                "Discriminator Fake validity": fake_validity.mean().item(),
+                "Discriminator Loss per iteration": d_loss.item()})
 
         # -----------------
-        #  Train Generator   (here it's wise coding way: the generator would be trained only when it's integer multiples of n_critic * accumualated_times)
+        #  Train Generator   (here it's wise coding way: the generator would be trained only when it's integer multiples of n_dis * accumualated_times)
         # -----------------
-        if global_steps % (args.n_critic * args.accumulated_times) == 0:
-            
-            for accumulated_idx in range(args.g_accumulated_times):
-                gen_z =  torch.randn([imgs.shape[0], args.noise_dim]).cuda(args.gpu, non_blocking = True)
-                gen_imgs = gen_net(gen_z)
-                fake_validity = dis_net(gen_imgs)
+        if global_steps % args.accumulated_times == 0:
+            for _ in range(args.n_gen):
+                for accumulated_idx in range(args.g_accumulated_times):
+                    gen_z =  torch.randn([imgs.shape[0], args.noise_dim]).cuda(args.gpu, non_blocking = True)
+                    gen_imgs = gen_net(gen_z)
+                    fake_validity = dis_net(gen_imgs)
 
-                # cal loss
-                loss_lz = torch.tensor(0)
-                if args.loss == "standard":
-                    # -log(D(G(z)))
-                    fake_validity = nn.Sigmoid()(fake_validity.view(-1))
-                    g_loss = - torch.sum(torch.log(fake_validity))
-                elif args.loss == "lsgan":
-                    real_label = torch.full((fake_validity.shape[0],), 1., dtype=torch.float, device=real_imgs.get_device())
-                    g_loss = nn.MSELoss()(fake_validity.view(-1), real_label)
-                elif args.loss == 'wgangp-mode':
-                    fake_image1, fake_image2 = gen_imgs[:args.batch_size//2], gen_imgs[args.batch_size//2:]
-                    z_random1, z_random2 = gen_z[:args.batch_size//2], gen_z[args.batch_size//2:]
-                    lz = torch.mean(torch.abs(fake_image2 - fake_image1)) / torch.mean(
-                    torch.abs(z_random2 - z_random1))
-                    eps = 1 * 1e-5
-                    loss_lz = 1 / (lz + eps)
+                    # cal loss
+                    loss_lz = torch.tensor(0)
+                    if args.loss == "standard":
+                        # -log(D(G(z)))
+                        fake_validity = nn.Sigmoid()(fake_validity.view(-1))
+                        g_loss = - torch.sum(torch.log(fake_validity))
+                    elif args.loss == "lsgan":
+                        real_label = torch.full((fake_validity.shape[0],), 1., dtype=torch.float, device=real_imgs.get_device())
+                        g_loss = nn.MSELoss()(fake_validity.view(-1), real_label)
+                    elif args.loss == 'wgangp-mode':
+                        fake_image1, fake_image2 = gen_imgs[:args.batch_size//2], gen_imgs[args.batch_size//2:]
+                        z_random1, z_random2 = gen_z[:args.batch_size//2], gen_z[args.batch_size//2:]
+                        lz = torch.mean(torch.abs(fake_image2 - fake_image1)) / torch.mean(
+                        torch.abs(z_random2 - z_random1))
+                        eps = 1 * 1e-5
+                        loss_lz = 1 / (lz + eps)
 
-                    g_loss = -torch.mean(fake_validity) + loss_lz
-                else:
-                    g_loss = -torch.mean(fake_validity)
-                g_loss = g_loss/float(args.g_accumulated_times)
-                g_loss.backward()
-                '''
-                TO DO: more loss functions
-                '''
-            
-            torch.nn.utils.clip_grad_norm_(gen_net.parameters(), 5.)
-            gen_optimizer.step()
-            gen_optimizer.zero_grad()
+                        g_loss = -torch.mean(fake_validity) + loss_lz
+                    else:
+                        g_loss = -torch.mean(fake_validity)
+                    g_loss = g_loss/float(args.g_accumulated_times)
+                    g_loss.backward()
+                    '''
+                    TO DO: more loss functions
+                    '''
+
+                torch.nn.utils.clip_grad_norm_(gen_net.parameters(), 5.)
+                gen_optimizer.step()
+                gen_optimizer.zero_grad()
 
             # adjust learning rate
             if schedulers:
@@ -178,14 +179,10 @@ def train(args, gen_net: nn.Module, dis_net: nn.Module, gen_optimizer, dis_optim
                 avg_p.mul_(ema_beta).add_(1. - ema_beta, cpu_p.cpu().data)
                 del cpu_p
 
-            writer.add_scalar('g_loss', g_loss.item(), global_steps//args.n_critic) if args.rank == 0 else 0
+            writer.add_scalar('g_loss', g_loss.item(), global_steps//args.n_dis) if args.rank == 0 else 0
             gen_step += 1
-            writer.add_scalar('Generator fake validity', fake_validity.mean().item(), global_steps//args.n_critic) if args.rank == 0 else 0
             wandb.log({"Generator loss per iteration": g_loss.item()})
-            g_loss_sum = g_loss_sum + g_loss
-            wandb.log({"Sum of Generator loss per epoch": g_loss_sum.item()})
 
-        d_loss_sum = d_loss_sum + d_loss
         # verbose
         if gen_step and iter_idx % args.print_freq == 0 and args.rank == 0:
             tqdm.write(
@@ -199,8 +196,6 @@ def train(args, gen_net: nn.Module, dis_net: nn.Module, gen_optimizer, dis_optim
             del d_loss
 
         writer_dict['train_global_steps'] = global_steps + 1
-
-        wandb.log({"Sum of Discriminator Loss per epoch": d_loss_sum.item()})
 
 
 def inverse_train(args, gen_net: nn.Module, dis_net: nn.Module, gen_optimizer, dis_optimizer, gen_avg_param, train_loader,
@@ -275,14 +270,14 @@ def inverse_train(args, gen_net: nn.Module, dis_net: nn.Module, gen_optimizer, d
             writer.add_scalar('Discriminator fake validity', fake_validity.mean().item(),
                               global_steps) if args.rank == 0 else 0
             wandb.log({
-                "Discriminator Loss per iteration": d_loss.item(),
                 "Discriminator Real validity": real_validity.mean().item(),
-                "Discriminator Fake validity": fake_validity.mean().item()})
+                "Discriminator Fake validity": fake_validity.mean().item(),
+                "Discriminator Loss per iteration": d_loss.item()})
 
         # -----------------
-        #  Train Generator   (here it's wise coding way: the generator would be trained only when it's integer multiples of n_critic * accumualated_times)
+        #  Train Generator   (here it's wise coding way: the generator would be trained only when it's integer multiples of n_dis * accumualated_times)
         # -----------------
-        if global_steps % (args.n_critic * args.accumulated_times) == 0:
+        if global_steps % (args.n_dis * args.accumulated_times) == 0:
 
             for accumulated_idx in range(args.g_accumulated_times):
                 imgs_n = torch.from_numpy(img_set[shuffle_no]).type(torch.cuda.FloatTensor).cuda(args.gpu,
@@ -344,13 +339,10 @@ def inverse_train(args, gen_net: nn.Module, dis_net: nn.Module, gen_optimizer, d
                 avg_p.mul_(ema_beta).add_(1. - ema_beta, cpu_p.cpu().data)
                 del cpu_p
 
-            writer.add_scalar('g_loss', g_loss.item(), global_steps // args.n_critic) if args.rank == 0 else 0
+            writer.add_scalar('g_loss', g_loss.item(), global_steps // args.n_dis) if args.rank == 0 else 0
             gen_step += 1
-            writer.add_scalar('Generator fake validity', fake_validity.mean().item(),
-                              global_steps // args.n_critic) if args.rank == 0 else 0
             wandb.log({"Generator loss per iteration": g_loss.item()})
             g_loss_sum = g_loss_sum + g_loss
-            wandb.log({"Sum of Generator loss per epoch": g_loss_sum.item()})
 
         d_loss_sum = d_loss_sum + d_loss
         # verbose
@@ -367,8 +359,6 @@ def inverse_train(args, gen_net: nn.Module, dis_net: nn.Module, gen_optimizer, d
             del d_loss
 
         writer_dict['train_global_steps'] = global_steps + 1
-
-        wandb.log({"Sum of Discriminator Loss per epoch": d_loss_sum.item()})
 
 def save_samples(args, fixed_z, epoch, gen_net: nn.Module, writer_dict, clean_dir=True):
 

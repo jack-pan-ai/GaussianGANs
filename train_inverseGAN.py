@@ -9,6 +9,7 @@ from utils.functions import inverse_train, save_samples, LinearLrDecay, load_par
 from utils.utils import set_log_dir, save_checkpoint, create_logger
 from utils.visualizationMetrics import visualization
 from dataset.MultiNormal.multi_normal_generate import MultiNormaldataset
+from utils.statEstimate import *
 
 import torch
 import torch.multiprocessing as mp
@@ -204,8 +205,8 @@ def main_worker(gpu, ngpus_per_node, args):
         '''
         pass
 
-    gen_scheduler = LinearLrDecay(gen_optimizer, args.g_lr, 0.0, 0, args.max_iter * args.n_critic)
-    dis_scheduler = LinearLrDecay(dis_optimizer, args.d_lr, 0.0, 0, args.max_iter * args.n_critic)
+    gen_scheduler = LinearLrDecay(gen_optimizer, args.g_lr, 0.0, 0, args.max_iter * args.n_gen)
+    dis_scheduler = LinearLrDecay(dis_optimizer, args.d_lr, 0.0, 0, args.max_iter * args.n_dis)
 
     # initial
     avg_gen_net = deepcopy(gen_net).cpu()
@@ -257,7 +258,7 @@ def main_worker(gpu, ngpus_per_node, args):
     print('------------------------------------------------------------')
 
     # wandb ai monitoring
-    project_name = 'loss: ' + args.loss + ', n: ' + str(args.n_critic)
+    project_name = 'loss: ' + args.loss + ', n_gen: ' + str(args.n_gen) + ', n_dis: ' + str(args.n_dis)
     wandb.init(project=args.exp_name, entity="qilong77", name=project_name)
     wandb.config = {
         "epochs": int(args.epochs) - int(start_epoch),
@@ -271,23 +272,65 @@ def main_worker(gpu, ngpus_per_node, args):
               train_loader, epoch, writer_dict, img_set, lr_schedulers)
 
         # save the generated time series after using PCA and t-SNE
+
         if args.rank == 0 or args.show:
             if (epoch) % args.eval_epochs == 0:
                 # backup_param = copy_params(gen_net)
                 # load_params(gen_net, gen_avg_param, args, mode="cpu")
                 # load_params(gen_net, backup_param, args)
-                # plot the generated data for every 5 epoch
                 with torch.no_grad():
                     imgs_s = torch.from_numpy(img_set[:args.eval_num]).type(torch.cuda.FloatTensor).cuda(args.gpu)
-                    sample_imgs = gen_net(imgs_s).detach().to('cpu')
-                visualization(ori_data=train_set[:args.eval_num], generated_data=sample_imgs, analysis='pca',
-                              save_name=args.exp_name, epoch=epoch, args=args)
-                image = plt.imread(
-                    os.path.join(args.path_helper['log_path_img'], f'{args.exp_name}_epoch_{epoch + 1}.png'))
-                image = rearrange(image, 'h w c -> c h w')
-                writer.add_image('Comparison for original and generative data based on PCA', image, epoch + 1)
 
-        is_best = False
+                    gen_noise = gen_net(imgs_s).detach().to('cpu')
+                # visuliztion: pca or t-sne plot or heatmap or qqplot
+                visualization(ori_data=train_set[:args.eval_num], generated_data=gen_noise, analysis='pca',
+                              save_name=args.exp_name, epoch=epoch, args=args)
+                qqplot(gen_noise.squeeze(1), epoch=epoch, args=args)
+                heatmap_cor(gen_noise.squeeze(1), epoch=epoch, args=args)
+                # correlation matrix distance
+                if epoch == 0:
+                    is_best_det = False
+                    det_dis = diff_cor(gen_noise.squeeze(1))
+                    det_dis_best = det_dis
+                else:
+                    det_dis = diff_cor(gen_noise.squeeze(1))
+                    if det_dis < det_dis_best:
+                        det_dis_best = det_dis
+                        is_best_det = True
+                    else:
+                        is_best_det = False
+                visu_pca = plt.imread(
+                    os.path.join(args.path_helper['log_path_img_pca'], f'{args.exp_name}_epoch_{epoch + 1}.png'))
+                visu_qqplot = plt.imread(
+                    os.path.join(args.path_helper['log_path_img_qqplot'], f'{args.exp_name}_epoch_{epoch + 1}.png'))
+                visu_heatmap = plt.imread(
+                    os.path.join(args.path_helper['log_path_img_heatmap'], f'{args.exp_name}_epoch_{epoch + 1}.png'))
+                img_visu_pca = wandb.Image(visu_pca, caption="Epoch: " + str(epoch))
+                img_visu_qqplot = wandb.Image(visu_qqplot, caption="Epoch: " + str(epoch))
+                img_visu_heatmap = wandb.Image(visu_heatmap, caption="Epoch: " + str(epoch))
+                wandb.log({'PCA': img_visu_pca,
+                           'QQplot': img_visu_qqplot,
+                           'Heatmap': img_visu_heatmap})
+                wandb.log({'Determinant': det_dis})
+                #visu_pca = rearrange(visu_pca, 'h w c -> c h w')
+                # writer.add_image('Comparison for original and generative data based on PCA', visu_pca, epoch + 1)
+                # writer.add_scalar('Correlation matrix distance using determinant', det_dis)
+                # writer.add_scalar('Correlation matrix distance using Euclidean distance', eucl_dis)
+
+        # save the best model
+        if epoch != 0:
+            if is_best_det:
+                save_checkpoint({
+                    'epoch': epoch + 1,
+                    'gen_model': args.gen_model,
+                    'dis_model': args.dis_model,
+                    'gen_state_dict': gen_net.state_dict(),
+                    'dis_state_dict': dis_net.state_dict(),
+                    'gen_optimizer': gen_optimizer.state_dict(),
+                    'dis_optimizer': dis_optimizer.state_dict(),
+                    'path_helper': args.path_helper,
+                }, args.path_helper['ckpt_path'], filename="checkpoint_best_det")
+
         avg_gen_net = deepcopy(gen_net)
         load_params(avg_gen_net, gen_avg_param, args)
         save_checkpoint({
@@ -300,7 +343,7 @@ def main_worker(gpu, ngpus_per_node, args):
             'gen_optimizer': gen_optimizer.state_dict(),
             'dis_optimizer': dis_optimizer.state_dict(),
             'path_helper': args.path_helper,
-        }, is_best, args.path_helper['ckpt_path'], filename="checkpoint")
+        }, args.path_helper['ckpt_path'], filename="checkpoint")
         del avg_gen_net
 
     print('===============================================')

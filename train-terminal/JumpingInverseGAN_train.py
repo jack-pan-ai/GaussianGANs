@@ -16,7 +16,7 @@ os.system(f"CUDA_VISIBLE_DEVICES=0,1,2,3,4,5,6,7 python ../train_inverseGAN.py \
 --g_lr 0.0001 \
 --d_lr 0.0003 \
 --loss lsgan \
---n_critic 1 \
+--n_dis 2 \
 --patch_size 15 \
 --phi 1 \
 --epochs 5000 \
