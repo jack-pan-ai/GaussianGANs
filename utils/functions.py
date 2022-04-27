@@ -368,14 +368,13 @@ def save_samples(args, fixed_z, epoch, gen_net: nn.Module, writer_dict, clean_di
         # generate images
         sample_imgs = []
         for i in range(fixed_z.size(0)):
-            sample_img = gen_net(fixed_z[i])
+            sample_img = gen_net(fixed_z[i]).to('cpu')
             sample_imgs.append(sample_img)
-        sample_imgs = torch.cat(sample_imgs, dim=0)
+        sample_imgs = torch.cat(sample_imgs, dim=0).numpy()
         os.makedirs(args.path_helper['sample_path'], exist_ok=True)
-        with open(os.path.join(args.path_helper['sample_path'], f'sampled_time_series_epoch_{epoch}.pkl'), 'wb')as f:
+        with open(os.path.join(args.path_helper['sample_path'], f'sampled_time_series_epoch_{epoch}.pkl'), 'wb') as f:
             pickle.dump(sample_imgs, f)
         f.close()
-    return sample_imgs
 
 class LinearLrDecay(object):
     def __init__(self, optimizer, start_lr, end_lr, decay_start_step, decay_end_step):

@@ -24,5 +24,6 @@ os.system(f"CUDA_VISIBLE_DEVICES=0,1,2,3,4,5,6,7 python ../train_GAN.py \
 --epochs 10000 \
 --batch_size 16 \
 --print_freq 50 \
+--checkpoint_best_PATH 'logs/JumpingInverse_2022_04_27_01_30_34/Model/checkpoint_best_det' \
 --class_name Jumping \
 --exp_name Jumping")

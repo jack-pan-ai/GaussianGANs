@@ -8,6 +8,9 @@ from models.GANModels import *
 from utils.functions import train, save_samples, LinearLrDecay, load_params, copy_params
 from utils.utils import set_log_dir, save_checkpoint, create_logger
 from utils.visualizationMetrics import visualization
+from utils.statEstimate import *
+from utils.utils import load_checkpoint
+from models.inverseGANModels import inverseGenerator
 
 import torch
 import torch.multiprocessing as mp
@@ -135,6 +138,15 @@ def main_worker(gpu, ngpus_per_node, args):
     dis_net = Discriminator(seq_len=seq_len, channels=channels,
                             num_heads=args.heads, depth=args.d_depth,
                             patch_size=args.patch_size)
+    # import inverse network
+    if args.checkpoint_best_PATH is not None:
+        gen_inv_net = inverseGenerator(seq_len=seq_len, channels=channels,
+                            num_heads= args.heads, latent_dim=args.noise_dim,
+                            depth=args.g_depth, patch_size=args.patch_size).cuda(0)
+        checkpoint_best_PATH = args.checkpoint_best_PATH
+        load_checkpoint(gen_inv_net, checkpoint_best_PATH)
+        gen_inv_net.eval()
+
     #print(dis_net)
     print('------------------------------------------------------------')
     print('Copy Gen/Dis networks to gpu')
@@ -269,22 +281,66 @@ def main_worker(gpu, ngpus_per_node, args):
               train_loader, epoch, writer_dict, lr_schedulers)
 
         # save the generated time series after using PCA and t-SNE
+
         if args.rank == 0 or args.show:
             if (epoch) % args.eval_epochs == 0:
                 #backup_param = copy_params(gen_net)
                 #load_params(gen_net, gen_avg_param, args, mode="cpu")
-                sample_imgs = save_samples(args, fixed_z, epoch + 1, gen_net, writer_dict)
-                #load_params(gen_net, backup_param, args)
+                # load_params(gen_net, backup_param, args)
+                with torch.no_grad():
+                    # sample_imgs is on GPU device
+                    sample_imgs = gen_net(fixed_z).detach()
+                save_samples(args, fixed_z[0].reshape(1, -1), epoch + 1, gen_net, writer_dict)
                 # evaluation the net from different perspective
-                visualization(ori_data=train_set[:args.eval_num], generated_data=sample_imgs, analysis='pca',
-                              save_name=args.exp_name, epoch=epoch, args = args)
+                visualization(ori_data=train_set[:args.eval_num], generated_data=sample_imgs.to('cpu'), analysis='pca',
+                              save_name=args.exp_name, epoch=epoch, args=args)
+                with torch.no_grad():
+                    sample_trans_imgs = gen_inv_net(sample_imgs.to('cuda:0')).detach().to('cpu')
+                qqplot(sample_trans_imgs.squeeze(1), epoch=epoch, args=args)
+                heatmap_cor(sample_trans_imgs.squeeze(1), epoch=epoch, args=args)
+                if epoch == 0:
+                    is_best_det = False
+                    det_dis = diff_cor(sample_trans_imgs.squeeze(1))
+                    det_dis_best = det_dis
+                else:
+                    det_dis = diff_cor(sample_trans_imgs.squeeze(1))
+                    if det_dis < det_dis_best:
+                        det_dis_best = det_dis
+                        is_best_det = True
+                    else:
+                        is_best_det = False
+                visu_pca = plt.imread(
+                    os.path.join(args.path_helper['log_path_img_pca'], f'{args.exp_name}_epoch_{epoch + 1}.png'))
+                visu_qqplot = plt.imread(
+                    os.path.join(args.path_helper['log_path_img_qqplot'], f'{args.exp_name}_epoch_{epoch + 1}.png'))
+                visu_heatmap = plt.imread(
+                    os.path.join(args.path_helper['log_path_img_heatmap'], f'{args.exp_name}_epoch_{epoch + 1}.png'))
+                img_visu_pca = wandb.Image(visu_pca, caption="Epoch: " + str(epoch))
+                img_visu_qqplot = wandb.Image(visu_qqplot, caption="Epoch: " + str(epoch))
+                img_visu_heatmap = wandb.Image(visu_heatmap, caption="Epoch: " + str(epoch))
+                wandb.log({'PCA': img_visu_pca,
+                           'QQplot': img_visu_qqplot,
+                           'Heatmap': img_visu_heatmap})
+                wandb.log({'Determinant': det_dis})
+                # image = plt.imread(os.path.join(args.path_helper['log_path_img'],f'{args.exp_name}_epoch_{epoch+1}.png'))
+                # wandb.log({'PCA plot': image})
+                # image = rearrange(image, 'h w c -> c h w')
+                # writer.add_image('Comparison for original and generative data based on PCA', image, epoch + 1)
 
-                image = plt.imread(os.path.join(args.path_helper['log_path_img'],f'{args.exp_name}_epoch_{epoch+1}.png'))
-                wandb.log({'PCA plot': image})
-                image = rearrange(image, 'h w c -> c h w')
-                writer.add_image('Comparison for original and generative data based on PCA', image, epoch + 1)
-        
-        is_best = False
+        # save the model
+        if epoch != 0:
+            if is_best_det:
+                save_checkpoint({
+                    'epoch': epoch + 1,
+                    'gen_model': args.gen_model,
+                    'dis_model': args.dis_model,
+                    'gen_state_dict': gen_net.state_dict(),
+                    'dis_state_dict': dis_net.state_dict(),
+                    'gen_optimizer': gen_optimizer.state_dict(),
+                    'dis_optimizer': dis_optimizer.state_dict(),
+                    'path_helper': args.path_helper,
+                }, args.path_helper['ckpt_path'], filename="checkpoint_best_det")
+
         avg_gen_net = deepcopy(gen_net)
         load_params(avg_gen_net, gen_avg_param, args)
         save_checkpoint({
@@ -297,8 +353,7 @@ def main_worker(gpu, ngpus_per_node, args):
             'gen_optimizer': gen_optimizer.state_dict(),
             'dis_optimizer': dis_optimizer.state_dict(),
             'path_helper': args.path_helper,
-            'fixed_z': fixed_z
-        }, is_best, args.path_helper['ckpt_path'], filename="checkpoint")
+        }, args.path_helper['ckpt_path'], filename="checkpoint")
         del avg_gen_net
 
     print('===============================================')

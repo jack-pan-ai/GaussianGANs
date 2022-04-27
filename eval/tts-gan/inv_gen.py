@@ -19,10 +19,9 @@ img_run = unimib_load_dataset(incl_xyz_accel=True, incl_rms_accel=False, incl_va
                                     class_name='Running', augment_times=None)
 invGen_net = inverseGenerator(seq_len=150, channels=3,
                            num_heads=5, latent_dim=64,
-                           depth=4, patch_size=15)
+                           depth=4, patch_size=15).cuda(0)
 checkpoint_PATH = 'train-terminal/logs/JumpingInverse_2022_04_19_19_57_42/Model/checkpoint'
 load_checkpoint(invGen_net, checkpoint_PATH)
-invGen_net.cuda(0)
 
 with torch.no_grad():
     img_jump_set = torch.from_numpy(img_jump[:100]).type(torch.cuda.FloatTensor).cuda(0)

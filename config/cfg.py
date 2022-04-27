@@ -141,20 +141,16 @@ def parse_args():
         type=str,
         help='The name of exp')
     parser.add_argument(
-        '--d_spectral_norm',
-        type=str2bool,
-        default=False,
-        help='add spectral_norm on discriminator?')
-    parser.add_argument(
-        '--g_spectral_norm',
-        type=str2bool,
-        default=False,
-        help='add spectral_norm on generator?')
-    parser.add_argument(
         '--dataset',
         type=str,
         default='cifar10',
         help='dataset type')
+    parser.add_argument(
+        '--checkpoint_best_PATH',
+        type=str,
+        default=None,
+        help='With well-trained inverse GAN, provide the path of best model'
+    )
     parser.add_argument(
         '--data_path',
         type=str,

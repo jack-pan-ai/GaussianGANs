@@ -24,5 +24,6 @@ os.system(f"CUDA_VISIBLE_DEVICES=0,1,2,3,4,5,6,7 python ../train_GAN.py \
 --batch_size 32 \
 --epochs 10000 \
 --print_freq 50 \
+--checkpoint_best_PATH 'logs/RunningInverse_2022_04_27_01_31_26/Model/checkpoint' \
 --class_name Running \
 --exp_name Running")
