@@ -301,7 +301,7 @@ def main_worker(gpu, ngpus_per_node, args):
 
                 if epoch == 0:
                     is_best_dis, is_best_p, is_best_cor, is_best_moment = False, False, False, False
-                    dis, p_dis, cor_dis, moment_dis = diff_cor(sample_trans_imgs.squeeze(1))
+                    dis, p_dis, cor_dis, moment_dis = 8, 0.7, 1.2, 6
                     dis_best, p_dis_best, cor_dis_best, moment_dis_best = dis, p_dis, cor_dis, moment_dis
                 else:
                     dis, p_dis, cor_dis, moment_dis = diff_cor(sample_trans_imgs.squeeze(1))
