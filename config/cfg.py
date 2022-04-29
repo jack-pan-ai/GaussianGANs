@@ -251,7 +251,7 @@ def parse_args():
                     help='show')
     parser.add_argument('--eval_epochs', type=int, default=10,
                         help='The evaluation epoch for generated data and save the generated samples')
-    parser.add_argument('--eval_num', type=int, default=200,
+    parser.add_argument('--eval_num', type=int, default=400,
                        help='The evaluation number of noise for generated data and save the generated samples')
     parser.add_argument('--swell_ratio', type = float, default=1.3,
                         help='visulizationMetrics: the ratio that enlarge the size of figure, eg, x_min * swell_ratio')

@@ -24,13 +24,23 @@ def diff_cor(x):
     n_fea = x.shape[1]
     x_mean = np.sum(np.abs(np.mean(x, axis=0)))
     x_std = np.sum(np.std(x, axis=0))
-    pvalue_shapiro = np.mean([stats.shapiro(x[:, i]) for i in range(n_fea)])
+    # normality
+    count = 0
+    pvalues_s = [stats.shapiro(x[:, i]) for i in range(n_fea)]
+    pvalues_da = [stats.normaltest(x[:, i]) for i in range(n_fea)]
+    for pvs, pvd in zip(pvalues_s, pvalues_da):
+        if pvs[1] > 0.7 or pvd[1] > 0.7:
+            count += 1
+    p_dis = count / n_fea
+    # correlation matrix
     p_cor = np.corrcoef(x.T)
-    diff_cor = (p_cor - np.diag(np.ones(n_fea)))
-    # compute the determinant value and  Euclidean distance
-    eucl_dis = np.mean(diff_cor**2) + np.mean(x_mean) + np.mean(np.abs(x_std - 1.)) - pvalue_shapiro
+    cor_dis = np.sqrt(np.sum((p_cor - np.diag(np.ones(n_fea)))**2)) / np.sqrt(n_fea)
+    # variance and mean: moment dis
+    moment_dis = np.sqrt((x_mean - 0)**2 / n_fea + (x_std - 1)**2 / n_fea)
+    # compute distance
+    dis = p_dis + cor_dis + moment_dis
 
-    return eucl_dis
+    return dis, p_dis, cor_dis, moment_dis
 
 def heatmap_cor(x, epoch, args = None):
     '''
@@ -70,7 +80,7 @@ def qqplot(x, epoch, args = None):
     n_fea = x.shape[1]
     fig = plt.figure()
     ax = fig.add_subplot(111)
-    x = np.sum(x**2, axis=0)
+    x = np.sum(x**2, axis=1)
     res = stats.probplot(x, dist=stats.chi2, sparams=(n_fea,), plot=ax)
     ax.set_title('QQ plot for Chi-square distribution')
     #plt.show()

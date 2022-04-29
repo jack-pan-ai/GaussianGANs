@@ -298,17 +298,23 @@ def main_worker(gpu, ngpus_per_node, args):
                     sample_trans_imgs = gen_inv_net(sample_imgs.to('cuda:0')).detach().to('cpu')
                 qqplot(sample_trans_imgs.squeeze(1), epoch=epoch, args=args)
                 heatmap_cor(sample_trans_imgs.squeeze(1), epoch=epoch, args=args)
+
                 if epoch == 0:
-                    is_best_det = False
-                    det_dis = diff_cor(sample_trans_imgs.squeeze(1))
-                    det_dis_best = det_dis
+                    is_best_dis, is_best_p, is_best_cor, is_best_moment = False, False, False, False
+                    dis, p_dis, cor_dis, moment_dis = diff_cor(sample_trans_imgs.squeeze(1))
+                    dis_best, p_dis_best, cor_dis_best, moment_dis_best = dis, p_dis, cor_dis, moment_dis
                 else:
-                    det_dis = diff_cor(sample_trans_imgs.squeeze(1))
-                    if det_dis < det_dis_best:
-                        det_dis_best = det_dis
-                        is_best_det = True
-                    else:
-                        is_best_det = False
+                    dis, p_dis, cor_dis, moment_dis = diff_cor(sample_trans_imgs.squeeze(1))
+                    if dis < dis_best:
+                        dis_best = dis
+                        is_best_dis = True
+                    elif p_dis < p_dis_best:
+                        p_dis_best = True
+                    elif cor_dis < cor_dis_best:
+                        is_best_cor = True
+                    elif moment_dis < moment_dis_best:
+                        is_best_moment = True
+
                 visu_pca = plt.imread(
                     os.path.join(args.path_helper['log_path_img_pca'], f'{args.exp_name}_epoch_{epoch + 1}.png'))
                 visu_qqplot = plt.imread(
@@ -321,25 +327,65 @@ def main_worker(gpu, ngpus_per_node, args):
                 wandb.log({'PCA': img_visu_pca,
                            'QQplot': img_visu_qqplot,
                            'Heatmap': img_visu_heatmap})
-                wandb.log({'Determinant': det_dis})
+                wandb.log({'Distance': dis,
+                           'p-value':p_dis,
+                           'cor_distance': cor_dis,
+                           'moment_dis':moment_dis})
                 # image = plt.imread(os.path.join(args.path_helper['log_path_img'],f'{args.exp_name}_epoch_{epoch+1}.png'))
                 # wandb.log({'PCA plot': image})
                 # image = rearrange(image, 'h w c -> c h w')
                 # writer.add_image('Comparison for original and generative data based on PCA', image, epoch + 1)
 
-        # save the model
-        if epoch != 0:
-            if is_best_det:
-                save_checkpoint({
-                    'epoch': epoch + 1,
-                    'gen_model': args.gen_model,
-                    'dis_model': args.dis_model,
-                    'gen_state_dict': gen_net.state_dict(),
-                    'dis_state_dict': dis_net.state_dict(),
-                    'gen_optimizer': gen_optimizer.state_dict(),
-                    'dis_optimizer': dis_optimizer.state_dict(),
-                    'path_helper': args.path_helper,
-                }, args.path_helper['ckpt_path'], filename="checkpoint_best_det")
+                # save the best model
+                if epoch != 0:
+                    if is_best_dis:
+                        save_checkpoint({
+                            'epoch': epoch + 1,
+                            'gen_model': args.gen_model,
+                            'dis_model': args.dis_model,
+                            'gen_state_dict': gen_net.state_dict(),
+                            'dis_state_dict': dis_net.state_dict(),
+                            'gen_optimizer': gen_optimizer.state_dict(),
+                            'dis_optimizer': dis_optimizer.state_dict(),
+                            'path_helper': args.path_helper,
+                        }, args.path_helper['ckpt_path'], filename="checkpoint_best_dis")
+                        is_best_dis = False
+                    elif is_best_moment:
+                        save_checkpoint({
+                            'epoch': epoch + 1,
+                            'gen_model': args.gen_model,
+                            'dis_model': args.dis_model,
+                            'gen_state_dict': gen_net.state_dict(),
+                            'dis_state_dict': dis_net.state_dict(),
+                            'gen_optimizer': gen_optimizer.state_dict(),
+                            'dis_optimizer': dis_optimizer.state_dict(),
+                            'path_helper': args.path_helper,
+                        }, args.path_helper['ckpt_path'], filename="checkpoint_best_moment")
+                        is_best_moment = False
+                    elif is_best_cor:
+                        save_checkpoint({
+                            'epoch': epoch + 1,
+                            'gen_model': args.gen_model,
+                            'dis_model': args.dis_model,
+                            'gen_state_dict': gen_net.state_dict(),
+                            'dis_state_dict': dis_net.state_dict(),
+                            'gen_optimizer': gen_optimizer.state_dict(),
+                            'dis_optimizer': dis_optimizer.state_dict(),
+                            'path_helper': args.path_helper,
+                        }, args.path_helper['ckpt_path'], filename="checkpoint_best_cor")
+                        is_best_cor = False
+                    elif is_best_p:
+                        save_checkpoint({
+                            'epoch': epoch + 1,
+                            'gen_model': args.gen_model,
+                            'dis_model': args.dis_model,
+                            'gen_state_dict': gen_net.state_dict(),
+                            'dis_state_dict': dis_net.state_dict(),
+                            'gen_optimizer': gen_optimizer.state_dict(),
+                            'dis_optimizer': dis_optimizer.state_dict(),
+                            'path_helper': args.path_helper,
+                        }, args.path_helper['ckpt_path'], filename="checkpoint_best_p")
+                        is_best_p = False
 
         avg_gen_net = deepcopy(gen_net)
         load_params(avg_gen_net, gen_avg_param, args)

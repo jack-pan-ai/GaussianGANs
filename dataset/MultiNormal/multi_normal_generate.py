@@ -30,7 +30,7 @@ class MultiNormaldataset(Dataset):
                 x = x.reshape(-1, 1, latent_dim)
                 with open('./MultiNormalDataset/train/multinormal_data.pkl', 'wb') as f:
                     pickle.dump(x, f)
-                print('Simulation for train dataset finished!')
+                print('Simulation for train dataset finished! and the shape is ', x.shape)
             else:
                 print("Train Dataset exist!")
         else:
