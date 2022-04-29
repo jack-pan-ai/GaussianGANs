@@ -274,6 +274,8 @@ def main_worker(gpu, ngpus_per_node, args):
         "batch_size": args.batch_size
     }
 
+    dis_best, p_dis_best, cor_dis_best, moment_dis_best = 8., 1., 2., 6.
+
     # train loop
     for epoch in range(int(start_epoch), int(args.epochs)):
         lr_schedulers = (gen_scheduler, dis_scheduler) if args.lr_decay else None
@@ -281,7 +283,6 @@ def main_worker(gpu, ngpus_per_node, args):
               train_loader, epoch, writer_dict, lr_schedulers)
 
         # save the generated time series after using PCA and t-SNE
-
         if args.rank == 0 or args.show:
             if (epoch) % args.eval_epochs == 0:
                 #backup_param = copy_params(gen_net)
@@ -299,10 +300,9 @@ def main_worker(gpu, ngpus_per_node, args):
                 qqplot(sample_trans_imgs.squeeze(1), epoch=epoch, args=args)
                 heatmap_cor(sample_trans_imgs.squeeze(1), epoch=epoch, args=args)
 
-                if epoch == 0:
+                if epoch < 100:
                     is_best_dis, is_best_p, is_best_cor, is_best_moment = False, False, False, False
-                    dis, p_dis, cor_dis, moment_dis = 8, 0.7, 1.2, 6
-                    dis_best, p_dis_best, cor_dis_best, moment_dis_best = dis, p_dis, cor_dis, moment_dis
+                    dis, p_dis, cor_dis, moment_dis = diff_cor(sample_trans_imgs.squeeze(1))
                 else:
                     dis, p_dis, cor_dis, moment_dis = diff_cor(sample_trans_imgs.squeeze(1))
                     if dis < dis_best:
@@ -337,7 +337,7 @@ def main_worker(gpu, ngpus_per_node, args):
                 # writer.add_image('Comparison for original and generative data based on PCA', image, epoch + 1)
 
                 # save the best model
-                if epoch != 0:
+                if epoch >= 100:
                     if is_best_dis:
                         save_checkpoint({
                             'epoch': epoch + 1,
@@ -387,20 +387,20 @@ def main_worker(gpu, ngpus_per_node, args):
                         }, args.path_helper['ckpt_path'], filename="checkpoint_best_p")
                         is_best_p = False
 
-        avg_gen_net = deepcopy(gen_net)
-        load_params(avg_gen_net, gen_avg_param, args)
-        save_checkpoint({
-            'epoch': epoch + 1,
-            'gen_model': args.gen_model,
-            'dis_model': args.dis_model,
-            'gen_state_dict': gen_net.state_dict(),
-            'dis_state_dict': dis_net.state_dict(),
-            'avg_gen_state_dict': avg_gen_net.state_dict(),
-            'gen_optimizer': gen_optimizer.state_dict(),
-            'dis_optimizer': dis_optimizer.state_dict(),
-            'path_helper': args.path_helper,
-        }, args.path_helper['ckpt_path'], filename="checkpoint")
-        del avg_gen_net
+        # avg_gen_net = deepcopy(gen_net)
+        # load_params(avg_gen_net, gen_avg_param, args)
+        # save_checkpoint({
+        #     'epoch': epoch + 1,
+        #     'gen_model': args.gen_model,
+        #     'dis_model': args.dis_model,
+        #     'gen_state_dict': gen_net.state_dict(),
+        #     'dis_state_dict': dis_net.state_dict(),
+        #     'avg_gen_state_dict': avg_gen_net.state_dict(),
+        #     'gen_optimizer': gen_optimizer.state_dict(),
+        #     'dis_optimizer': dis_optimizer.state_dict(),
+        #     'path_helper': args.path_helper,
+        # }, args.path_helper['ckpt_path'], filename="checkpoint")
+        # del avg_gen_net
 
     print('===============================================')
     print('Training Finished & Model Saved, the path is: ', args.path_helper['ckpt_path']+ '/'+ 'checkpoint')

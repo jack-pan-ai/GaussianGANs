@@ -29,7 +29,7 @@ def diff_cor(x):
     pvalues_s = [stats.shapiro(x[:, i]) for i in range(n_fea)]
     pvalues_da = [stats.normaltest(x[:, i]) for i in range(n_fea)]
     for pvs, pvd in zip(pvalues_s, pvalues_da):
-        if pvs[1] > 0.7 or pvd[1] > 0.7:
+        if pvs[1] > 0.9 or pvd[1] > 0.9:
             count += 1
     p_dis = count / n_fea
     # correlation matrix
