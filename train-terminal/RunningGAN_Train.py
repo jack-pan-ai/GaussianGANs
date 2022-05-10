@@ -23,7 +23,8 @@ os.system(f"CUDA_VISIBLE_DEVICES=0,1,2,3,4,5,6,7 python ../train_GAN.py \
 --phi 1 \
 --batch_size 32 \
 --epochs 3000 \
+--eval_num 500 \
 --print_freq 50 \
---checkpoint_best_PATH '/home/panq/python_project/transformer-gan/train-terminal/save/RunningGaussianGANs' \
+--checkpoint_best_PATH '/home/panq/python_project/GaussianGANs/train-terminal/save/RunningGaussianGANs' \
 --class_name Running \
 --exp_name Running-dis-v3-ground")

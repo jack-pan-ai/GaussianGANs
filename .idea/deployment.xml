@@ -1,11 +1,11 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <project version="4">
-  <component name="PublishConfigData" autoUpload="Always" serverName="peacock" deleteMissingItems="true" createEmptyFolders="true" remoteFilesAllowedToDisappearOnAutoupload="false" autoUploadExternalChanges="true">
+  <component name="PublishConfigData" autoUpload="Always" serverName="panq@rooster" deleteMissingItems="true" createEmptyFolders="true" remoteFilesAllowedToDisappearOnAutoupload="false" autoUploadExternalChanges="true">
     <serverData>
-      <paths name="peacock">
+      <paths name="panq@rooster">
         <serverdata>
           <mappings>
-            <mapping deploy="/python_project/transformer-gan" local="$PROJECT_DIR$" web="/" />
+            <mapping deploy="/home/panq/python_project/GaussianGANs" local="$PROJECT_DIR$" />
           </mappings>
         </serverdata>
       </paths>

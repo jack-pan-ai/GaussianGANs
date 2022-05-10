@@ -32,7 +32,7 @@ def visualization (ori_data, generated_data, analysis, save_name, epoch, args):
     - analysis: tsne or pca
     """  
     # Analysis sample size (for faster computation)
-    anal_sample_no = min([1000, len(ori_data)])
+    anal_sample_no = min([args.eval_num, len(ori_data)])
 
     # Data preprocessing
     ori_data = np.asarray(ori_data)

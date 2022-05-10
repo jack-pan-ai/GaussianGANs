@@ -140,9 +140,14 @@ def main_worker(gpu, ngpus_per_node, args):
                             patch_size=args.patch_size)
     # import inverse network
     if args.checkpoint_best_PATH is not None:
-        gen_inv_net = inverseGenerator(seq_len=seq_len, channels=channels,
-                            num_heads= args.heads, latent_dim=args.noise_dim,
-                            depth=args.g_depth, patch_size=args.patch_size).cuda(0)
+        if args.gpu is not None:
+            gen_inv_net = inverseGenerator(seq_len=seq_len, channels=channels,
+                                num_heads= args.heads, latent_dim=args.noise_dim,
+                                depth=args.g_depth, patch_size=args.patch_size).cuda(args.gpu)
+        else:
+            gen_inv_net = inverseGenerator(seq_len=seq_len, channels=channels,
+                                           num_heads=args.heads, latent_dim=args.noise_dim,
+                                           depth=args.g_depth, patch_size=args.patch_size).cuda()
         checkpoint_best_PATH = args.checkpoint_best_PATH
         load_checkpoint(gen_inv_net, checkpoint_best_PATH)
         gen_inv_net.eval()
@@ -296,7 +301,7 @@ def main_worker(gpu, ngpus_per_node, args):
                 visualization(ori_data=train_set[:args.eval_num], generated_data=sample_imgs.to('cpu'), analysis='pca',
                               save_name=args.exp_name, epoch=epoch, args=args)
                 with torch.no_grad():
-                    sample_trans_imgs = gen_inv_net(sample_imgs.to('cuda:0')).detach().to('cpu')
+                    sample_trans_imgs = gen_inv_net(sample_imgs.to('cuda:'+str(args.gpu))).detach().to('cpu')
                 qqplot(sample_trans_imgs.squeeze(1), epoch=epoch, args=args, save_name=args.exp_name)
                 heatmap_cor(sample_trans_imgs.squeeze(1), epoch=epoch, args=args, save_name=args.exp_name)
                 # visualization for ground truth data
@@ -304,7 +309,7 @@ def main_worker(gpu, ngpus_per_node, args):
                 visualization(ori_data=test_set[:(len(test_set) - 1)], generated_data=sample_imgs.to('cpu'), analysis='pca',
                               save_name=name_ground_truth, epoch=epoch, args=args)
                 with torch.no_grad():
-                    sample_trans_imgs_ground = gen_inv_net(test_set[:(len(test_set) - 1)].to('cuda:0')).detach().to('cpu')
+                    sample_trans_imgs_ground = gen_inv_net(torch.from_numpy(test_set[:(len(test_set) - 1)]).type(torch.cuda.FloatTensor).cuda(args.gpu, non_blocking=True)).detach().to('cpu')
                 qqplot(sample_trans_imgs_ground.squeeze(1), epoch=epoch, args=args, save_name=name_ground_truth)
                 heatmap_cor(sample_trans_imgs_ground.squeeze(1), epoch=epoch, args=args, save_name=name_ground_truth)
 
@@ -350,13 +355,22 @@ def main_worker(gpu, ngpus_per_node, args):
                 wandb.log({'Ground-truth PCA': img_visu_pca_ground,
                            'Ground-truth QQplot': img_visu_qqplot_ground,
                            'Ground-truth Heatmap': img_visu_heatmap_ground})
-
                 wandb.log({'Distance': dis,
-                           'p-value':p_dis,
+                           'p-value': p_dis,
                            'cor_distance': cor_dis,
-                           'moment_dis':moment_dis})
-                # image = plt.imread(os.path.join(args.path_helper['log_path_img'],f'{args.exp_name}_epoch_{epoch+1}.png'))
-                # wandb.log({'PCA plot': image})
+                           'moment_dis': moment_dis})
+
+                writer.add_scalar('S', dis, epoch)
+                writer.add_scalar('S1', moment_dis, epoch)
+                writer.add_scalar('S2', cor_dis, epoch)
+                writer.add_scalar('S3', p_dis, epoch)
+                writer.add_image('PCA' + str(epoch), visu_pca, epoch, dataformats='HWC')
+                writer.add_image('QQ-plot' + str(epoch), visu_qqplot, epoch, dataformats='HWC')
+                writer.add_image('Heatmap-correlation-matrix' + str(epoch), visu_heatmap, epoch, dataformats='HWC')
+                writer.add_image('Ground-truth-PCA' + str(epoch), visu_pca_ground, epoch, dataformats='HWC')
+                writer.add_image('Ground-truth-QQ-plot' + str(epoch), visu_qqplot_ground, epoch, dataformats='HWC')
+                writer.add_image('Ground-truth-Heatmap-correlation-matrix' + str(epoch), visu_heatmap_ground, epoch, dataformats='HWC')
+
                 # image = rearrange(image, 'h w c -> c h w')
                 # writer.add_image('Comparison for original and generative data based on PCA', image, epoch + 1)
 
