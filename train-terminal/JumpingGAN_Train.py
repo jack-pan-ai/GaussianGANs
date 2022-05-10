@@ -24,6 +24,6 @@ os.system(f"CUDA_VISIBLE_DEVICES=0,1,2,3,4,5,6,7 python ../train_GAN.py \
 --epochs 3000 \
 --batch_size 16 \
 --print_freq 50 \
---checkpoint_best_PATH 'logs/JumpingInverse-dis-v3_2022_04_29_04_54_02/Model/checkpoint_best_dis' \
+--checkpoint_best_PATH '/home/panq/python_project/transformer-gan/train-terminal/save/JumpingGaussianGANs' \
 --class_name Jumping \
 --exp_name Jumping-dis-v3-ground")
