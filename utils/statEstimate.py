@@ -29,7 +29,7 @@ def diff_cor(x):
     pvalues_s = [stats.shapiro(x[:, i]) for i in range(n_fea)]
     pvalues_da = [stats.normaltest(x[:, i]) for i in range(n_fea)]
     for pvs, pvd in zip(pvalues_s, pvalues_da):
-        if pvs[1] > 0.9 or pvd[1] > 0.9:
+        if pvs[1] > 0.95 or pvd[1] > 0.95:
             count += 1
     p_dis = count / n_fea
     # correlation matrix
@@ -42,7 +42,7 @@ def diff_cor(x):
 
     return dis, p_dis, cor_dis, moment_dis
 
-def heatmap_cor(x, epoch, args = None):
+def heatmap_cor(x, epoch, args = None, save_name=None):
     '''
     used to plot the correlation matrix
     :param x: input batch_size model [batch_size, noise_dimension]
@@ -64,10 +64,10 @@ def heatmap_cor(x, epoch, args = None):
     ax.set_title('Heatmap for correlation matrix')
     #plt.show()
     if args is not None:
-        plt.savefig(os.path.join(args.path_helper['log_path_img_heatmap'],f'{args.exp_name}_epoch_{epoch+1}.png'), format="png")
+        plt.savefig(os.path.join(args.path_helper['log_path_img_heatmap'],f'{save_name}_epoch_{epoch+1}.png'), format="png")
 
 
-def qqplot(x, epoch, args = None):
+def qqplot(x, epoch, args = None, save_name=None):
     if type(x) is torch.Tensor:
         if x.get_device:
             x = x.cpu()
@@ -85,7 +85,7 @@ def qqplot(x, epoch, args = None):
     ax.set_title('QQ plot for Chi-square distribution')
     #plt.show()
     if args is not None:
-        plt.savefig(os.path.join(args.path_helper['log_path_img_qqplot'],f'{args.exp_name}_epoch_{epoch+1}.png'), format="png")
+        plt.savefig(os.path.join(args.path_helper['log_path_img_qqplot'],f'{save_name}_epoch_{epoch+1}.png'), format="png")
 
 
 if __name__=='__main__':

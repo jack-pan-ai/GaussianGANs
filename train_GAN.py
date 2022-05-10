@@ -292,13 +292,21 @@ def main_worker(gpu, ngpus_per_node, args):
                     # sample_imgs is on GPU device
                     sample_imgs = gen_net(fixed_z).detach()
                 save_samples(args, fixed_z[0].reshape(1, -1), epoch + 1, gen_net, writer_dict)
-                # evaluation the net from different perspective
+                # visualization for generated data
                 visualization(ori_data=train_set[:args.eval_num], generated_data=sample_imgs.to('cpu'), analysis='pca',
                               save_name=args.exp_name, epoch=epoch, args=args)
                 with torch.no_grad():
                     sample_trans_imgs = gen_inv_net(sample_imgs.to('cuda:0')).detach().to('cpu')
-                qqplot(sample_trans_imgs.squeeze(1), epoch=epoch, args=args)
-                heatmap_cor(sample_trans_imgs.squeeze(1), epoch=epoch, args=args)
+                qqplot(sample_trans_imgs.squeeze(1), epoch=epoch, args=args, save_name=args.exp_name)
+                heatmap_cor(sample_trans_imgs.squeeze(1), epoch=epoch, args=args, save_name=args.exp_name)
+                # visualization for ground truth data
+                name_ground_truth = args.exp_name + str('ground')
+                visualization(ori_data=test_set[:(len(test_set) - 1)], generated_data=sample_imgs.to('cpu'), analysis='pca',
+                              save_name=name_ground_truth, epoch=epoch, args=args)
+                with torch.no_grad():
+                    sample_trans_imgs_ground = gen_inv_net(test_set[:(len(test_set) - 1)].to('cuda:0')).detach().to('cpu')
+                qqplot(sample_trans_imgs_ground.squeeze(1), epoch=epoch, args=args, save_name=name_ground_truth)
+                heatmap_cor(sample_trans_imgs_ground.squeeze(1), epoch=epoch, args=args, save_name=name_ground_truth)
 
                 if epoch < 100:
                     is_best_dis, is_best_p, is_best_cor, is_best_moment = False, False, False, False
@@ -315,6 +323,7 @@ def main_worker(gpu, ngpus_per_node, args):
                     elif moment_dis < moment_dis_best:
                         is_best_moment = True
 
+                # wandb for generated data
                 visu_pca = plt.imread(
                     os.path.join(args.path_helper['log_path_img_pca'], f'{args.exp_name}_epoch_{epoch + 1}.png'))
                 visu_qqplot = plt.imread(
@@ -327,6 +336,21 @@ def main_worker(gpu, ngpus_per_node, args):
                 wandb.log({'PCA': img_visu_pca,
                            'QQplot': img_visu_qqplot,
                            'Heatmap': img_visu_heatmap})
+
+                # wand for ground truth
+                visu_pca_ground = plt.imread(
+                    os.path.join(args.path_helper['log_path_img_pca'], f'{name_ground_truth}_epoch_{epoch + 1}.png'))
+                visu_qqplot_ground = plt.imread(
+                    os.path.join(args.path_helper['log_path_img_qqplot'], f'{name_ground_truth}_epoch_{epoch + 1}.png'))
+                visu_heatmap_ground = plt.imread(
+                    os.path.join(args.path_helper['log_path_img_heatmap'], f'{name_ground_truth}_epoch_{epoch + 1}.png'))
+                img_visu_pca_ground = wandb.Image(visu_pca_ground, caption="Epoch: " + str(epoch))
+                img_visu_qqplot_ground = wandb.Image(visu_qqplot_ground, caption="Epoch: " + str(epoch))
+                img_visu_heatmap_ground = wandb.Image(visu_heatmap_ground, caption="Epoch: " + str(epoch))
+                wandb.log({'Ground-truth PCA': img_visu_pca_ground,
+                           'Ground-truth QQplot': img_visu_qqplot_ground,
+                           'Ground-truth Heatmap': img_visu_heatmap_ground})
+
                 wandb.log({'Distance': dis,
                            'p-value':p_dis,
                            'cor_distance': cor_dis,
