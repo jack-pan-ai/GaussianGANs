@@ -27,9 +27,6 @@ python RunningInverseGAN_train.py
 
 - Thirdly, check the results on wandb account
 
-
-
-
 ## Description 
  - **Dataset**
  The way of downloading dataset is contained the folder ```./dataset/```, which would be automatically downloaded and simulated when training the model.
@@ -39,3 +36,7 @@ python RunningInverseGAN_train.py
  
  - **Visualization Tools**
  The heatmap for correlation matrix, QQ-plot, and PCA/t-SNE are all contained in the ```./utils```
+ 
+ ## TO DO
+ 
+ - [ ] Do the simulation verifcation on Gaussian Random Field (GRF) 
