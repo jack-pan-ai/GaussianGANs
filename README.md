@@ -13,11 +13,12 @@
 
 For the Running dataset:
 
- - Firstly, training a generative model to generate the multivariate time series;
+ - (Optional) Firstly, training a generative model to generate the multivariate time series;
 ```
 cd ./train-terminal/
 python RunningGAN_Train.py
 ```
+The well-trained models are provided in the file ```train-terminal/save/```
 
  - Secondly, traing the Gaussian GANs to transform the true data into multivariate Gaussian distribution;
 ```
