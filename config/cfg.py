@@ -55,6 +55,18 @@ def parse_args():
         default=64,
         help='size of the batches to load dataset')
     parser.add_argument(
+        '--transform',
+        type=bool,
+        default=False,
+        help='Transformation on Generated Multivariate Gaussian Distribution'
+    )
+    parser.add_argument(
+        '--truncate',
+        type=bool,
+        default=False,
+        help='Truncate on Generated Multivariate Gaussian Distribution'
+    )
+    parser.add_argument(
         '--g_lr',
         type=float,
         default=0.0001,

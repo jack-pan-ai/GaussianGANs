@@ -4,6 +4,7 @@ from __future__ import print_function
 
 from config import cfg
 from dataset.UniMiB.dataLoader import *
+from dataset.MultiNormal.multi_normal_generate import *
 from models.GANModels import *
 from utils.functions import train, save_samples, LinearLrDecay, load_params, copy_params
 from utils.utils import set_log_dir, save_checkpoint, create_logger
@@ -117,14 +118,25 @@ def main_worker(gpu, ngpus_per_node, args):
     # train_set = VTSDataset(set_type = 'train')
     # test_set = TSDataset(set_type = 'test')
     # [batch_size, channles, seq-len]
-    train_set = unimib_load_dataset(incl_xyz_accel=True, incl_rms_accel=False, incl_val_group=False, is_normalize=True,
-                                    one_hot_encode=False, data_mode='Train', single_class=True,
-                                    class_name=args.class_name, augment_times=args.augment_times)
-    train_loader = data.DataLoader(train_set, batch_size=args.batch_size, num_workers=args.num_workers, shuffle=True)
-    test_set = unimib_load_dataset(incl_xyz_accel=True, incl_rms_accel=False, incl_val_group=False, is_normalize=True,
-                                   one_hot_encode=False, data_mode='Test', single_class=True,
-                                   class_name=args.class_name)
-    test_loader = data.DataLoader(test_set, batch_size=args.batch_size, num_workers=args.num_workers, shuffle=True)
+    if args.dataset == 'UniMiB':
+        train_set = unimib_load_dataset(incl_xyz_accel=True, incl_rms_accel=False, incl_val_group=False, is_normalize=True,
+                                        one_hot_encode=False, data_mode='Train', single_class=True,
+                                        class_name=args.class_name, augment_times=args.augment_times)
+        train_loader = data.DataLoader(train_set, batch_size=args.batch_size, num_workers=args.num_workers, shuffle=True)
+        test_set = unimib_load_dataset(incl_xyz_accel=True, incl_rms_accel=False, incl_val_group=False, is_normalize=True,
+                                       one_hot_encode=False, data_mode='Test', single_class=True,
+                                       class_name=args.class_name)
+        #test_loader = data.DataLoader(test_set, batch_size=args.batch_size, num_workers=args.num_workers, shuffle=True)
+    elif args.dataset == 'Simulation':
+        train_set = MultiNormaldataset(latent_dim=args.noise_dim, size=10000, mode='train', transform=args.transform, truncate=args.truncate)
+        train_loader = data.DataLoader(train_set, batch_size=args.batch_size, num_workers=args.num_workers, shuffle=True)
+        test_set = MultiNormaldataset(latent_dim=args.noise_dim, size=1000, mode='test', transform=args.transform, truncate=args.truncate)
+        #test_loader = data.DataLoader(test_set, batch_size=args.batch_size, num_workers=args.num_workers, shuffle=True)
+
+    else:
+        print('Please input the correct dataset name: UniMiB or Simulation.')
+        raise TypeError
+
     print('------------------------------------------------------------')
     print('How many iterations in a training epoch: ', len(train_loader))
     print('------------------------------------------------------------')

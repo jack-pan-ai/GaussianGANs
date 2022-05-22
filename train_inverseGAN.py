@@ -121,10 +121,16 @@ def main_worker(gpu, ngpus_per_node, args):
 
     # [batch_size, channles, seq-len]
     print('------------------------------------------------------------')
-    print('--------------------UniMiB Dataset--------------------------')
-    img_set = unimib_load_dataset(incl_xyz_accel=True, incl_rms_accel=False, incl_val_group=False, is_normalize=True,
-                                    one_hot_encode=False, data_mode='Train', single_class=True,
-                                    class_name=args.class_name, augment_times=args.augment_times)
+    print('--------------------GaussianGANs Dataset--------------------------')
+    if args.dataset =='UniMiB':
+        img_set = unimib_load_dataset(incl_xyz_accel=True, incl_rms_accel=False, incl_val_group=False, is_normalize=True,
+                                        one_hot_encode=False, data_mode='Train', single_class=True,
+                                        class_name=args.class_name, augment_times=args.augment_times)
+    elif args.dataset =='Simulation':
+        img_set = MultiNormaldataset(latent_dim=args.noise_dim, size=10000, mode='train', transform=args.transform, truncate=args.truncate)
+    else:
+        print('Please input the correct dataset name: UniMiB or Simulation.')
+        raise TypeError
     print('------------------------------------------------------------')
     print('How many iterations in a training epoch: ', len(train_loader))
     print('------------------------------------------------------------')
@@ -258,8 +264,8 @@ def main_worker(gpu, ngpus_per_node, args):
     print('------------------------------------------------------------')
 
     # wandb ai monitoring
-    project_name = 'loss: ' + args.loss + ', n_gen: ' + str(args.n_gen) + ', n_dis: ' + str(args.n_dis)
-    wandb.init(project=args.exp_name, entity="qilong77", name=project_name)
+    # project_name = 'loss: ' + args.loss + ', n_gen: ' + str(args.n_gen) + ', n_dis: ' + str(args.n_dis)
+    wandb.init(project=args.dataset, entity="qilong77", name=args.exp_name)
     wandb.config = {
         "epochs": int(args.epochs) - int(start_epoch),
         "batch_size": args.batch_size
@@ -287,8 +293,8 @@ def main_worker(gpu, ngpus_per_node, args):
                 # visuliztion: pca or t-sne plot or heatmap or qqplot
                 visualization(ori_data=train_set[:args.eval_num], generated_data=gen_noise, analysis='pca',
                               save_name=args.exp_name, epoch=epoch, args=args)
-                qqplot(gen_noise.squeeze(1), epoch=epoch, args=args)
-                heatmap_cor(gen_noise.squeeze(1), epoch=epoch, args=args)
+                qqplot(gen_noise.squeeze(1), epoch=epoch, args=args, save_name=args.exp_name)
+                heatmap_cor(gen_noise.squeeze(1), epoch=epoch, args=args, save_name=args.exp_name)
                 # correlation matrix distance
                 if epoch < 100:
                     is_best_dis, is_best_p, is_best_cor, is_best_moment = False, False, False, False

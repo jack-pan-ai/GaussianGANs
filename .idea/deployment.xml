@@ -1,8 +1,8 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <project version="4">
-  <component name="PublishConfigData" autoUpload="Always" serverName="panq@rooster" deleteMissingItems="true" createEmptyFolders="true" remoteFilesAllowedToDisappearOnAutoupload="false" autoUploadExternalChanges="true">
+  <component name="PublishConfigData" autoUpload="Always" serverName="panq@rooster-GaussianGANs" deleteMissingItems="true" createEmptyFolders="true" remoteFilesAllowedToDisappearOnAutoupload="false" autoUploadExternalChanges="true">
     <serverData>
-      <paths name="panq@rooster">
+      <paths name="panq@rooster-GaussianGANs">
         <serverdata>
           <mappings>
             <mapping deploy="/home/panq/python_project/GaussianGANs" local="$PROJECT_DIR$" />
