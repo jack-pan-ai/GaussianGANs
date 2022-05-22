@@ -306,12 +306,14 @@ def main_worker(gpu, ngpus_per_node, args):
                 heatmap_cor(sample_trans_imgs.squeeze(1), epoch=epoch, args=args, save_name=args.exp_name)
                 # visualization for ground truth data
                 name_ground_truth = args.exp_name + str('ground')
-                visualization(ori_data=test_set[:(len(test_set) - 1)], generated_data=sample_imgs.to('cpu'), analysis='pca',
+                visualization(ori_data=train_set[:args.eval_num], generated_data=test_set[:(len(test_set) - 1)], analysis='pca',
                               save_name=name_ground_truth, epoch=epoch, args=args)
                 with torch.no_grad():
                     sample_trans_imgs_ground = gen_inv_net(torch.from_numpy(test_set[:(len(test_set) - 1)]).type(torch.cuda.FloatTensor).cuda(args.gpu, non_blocking=True)).detach().to('cpu')
                 qqplot(sample_trans_imgs_ground.squeeze(1), epoch=epoch, args=args, save_name=name_ground_truth)
                 heatmap_cor(sample_trans_imgs_ground.squeeze(1), epoch=epoch, args=args, save_name=name_ground_truth)
+
+                dis_ground, p_dis_ground, cor_dis_ground, moment_dis_ground = diff_cor(sample_trans_imgs_ground.squeeze(1))
 
                 if epoch < 100:
                     is_best_dis, is_best_p, is_best_cor, is_best_moment = False, False, False, False
@@ -358,7 +360,12 @@ def main_worker(gpu, ngpus_per_node, args):
                 wandb.log({'Distance': dis,
                            'p-value': p_dis,
                            'cor_distance': cor_dis,
-                           'moment_dis': moment_dis})
+                           'moment_dis': moment_dis,
+                           'Ground_Distance': dis_ground,
+                           'Ground_p-value': p_dis_ground,
+                           'Ground_cor_distance': cor_dis_ground,
+                           'Ground_moment_dis': moment_dis_ground,
+                           })
 
                 writer.add_scalar('S', dis, epoch)
                 writer.add_scalar('S1', moment_dis, epoch)
