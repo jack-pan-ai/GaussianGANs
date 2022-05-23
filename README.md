@@ -25,7 +25,7 @@ GRF contains **pointwise transformation and truncation**.
 cd ./train-terminal/
 python SimuInverseGAN_train.py
 ```
-   - The well-trained models are provided in the file ```train-terminal/save/```, and you can use them without training new Gaussian GANs (around 2hrs).
+   - The well-trained models are provided in the file ```train-terminal/save/```, and you can use them without training new Gaussian GANs (around 18hrs).
    - If your would like to reproduce the paper, you need to use three combinations of arguments: 
 
      - ```--truncate True```

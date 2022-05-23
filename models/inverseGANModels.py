@@ -24,7 +24,7 @@ class inverseGenerator(nn.Module):
         self.forward_drop_rate = forward_drop_rate
 
         self.l1 = nn.Linear(self.seq_len * self.embed_dim, self.latent_dim)
-        self.pos_embed = nn.Parameter(torch.zeros(1, self.channels, self.seq_len))
+        self.pos_embed = nn.Parameter(torch.randn(1, self.channels, self.seq_len))
         self.blocks = Gen_TransformerEncoder(
             depth=self.depth,
             num_heads = self.num_heads,
@@ -176,11 +176,16 @@ class PatchEmbedding_Linear(nn.Module):
         super().__init__()
         # change the conv2d parameters here
         self.projection = nn.Sequential(
+            # add a linear to make all length of data could be served as input for discriminator
+            nn.Linear(seq_length, seq_length * patch_size),
+            # [batch_size, channels, seq_len] -> [batch_size, channels, seq_len*patch_size]
             Rearrange('b c (w s2) -> b w (s2 c)', s2=patch_size),
+            # [batch_size, channels, seq_len*patch_size] -> [batch_size, seq_len, channels*patch_size]
             nn.Linear(patch_size * in_channels, emb_size)
+            # [batch_size, seq_len, channels*patch_size] -> [batch_size, seq_len, emb_size]
         )
         self.cls_token = nn.Parameter(torch.randn(1, 1, emb_size))
-        self.positions = nn.Parameter(torch.randn((seq_length // patch_size) + 1, emb_size))
+        self.positions = nn.Parameter(torch.randn(seq_length + 1, emb_size))
 
     def forward(self, x: Tensor) -> Tensor:
         b, _, _ = x.shape

@@ -1,5 +1,6 @@
 from numpy.random import multivariate_normal
 import numpy as np
+import random
 import pickle
 import os
 from torch.utils.data import Dataset
@@ -9,17 +10,26 @@ def transform_Gaussian(latent_dim, size, transform, truncate, channels=1):
     length_whole = latent_dim*channels
     mean = np.random.uniform(1, 10, size=length_whole)
     # let covariance matrix to be positive-semidefinite
-    cov = np.random.uniform(-3, 3, size=length_whole ** 2).reshape(length_whole, length_whole)
+    cov = np.random.uniform(-7, 7, size=length_whole ** 2).reshape(length_whole, length_whole)
     cov = np.dot(cov, cov.T)
     cov = cov + cov.T
     x = multivariate_normal(mean=mean, cov=cov, size=size)
+
+    # used to add the linearity in our GRF
+    if False:
+        linear_trans = np.random.random((length_whole//2)**2).reshape(length_whole//2, length_whole//2)
+        x_trans = np.matmul(x[:, 0:(length_whole//2)], linear_trans)
+        x = np.concatenate([x[:, 0:(length_whole//2)], x_trans], axis=1)
+        shuffle_no = np.arange(length_whole)
+        random.shuffle(shuffle_no)
+        x = x[:, shuffle_no].reshape(-1, length_whole)
 
     if transform:
         # non-linear transformation
         x = 2 * np.log(np.abs(x)) + 1
     if truncate:
         # truncation
-        c = 7.
+        c = 17.
         x[x >= c] = c
     # reshape the dataset
     x = x.reshape(-1, channels, latent_dim)
