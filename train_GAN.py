@@ -128,9 +128,9 @@ def main_worker(gpu, ngpus_per_node, args):
                                        class_name=args.class_name)
         #test_loader = data.DataLoader(test_set, batch_size=args.batch_size, num_workers=args.num_workers, shuffle=True)
     elif args.dataset == 'Simulation':
-        train_set = MultiNormaldataset(latent_dim=args.noise_dim, size=10000, mode='train', transform=args.transform, truncate=args.truncate)
+        train_set = MultiNormaldataset(latent_dim=args.noise_dim, size=100000, channels = args.simu_channels, mode='train', transform=args.transform, truncate=args.truncate, simu_dim=args.simu_dim)
         train_loader = data.DataLoader(train_set, batch_size=args.batch_size, num_workers=args.num_workers, shuffle=True)
-        test_set = MultiNormaldataset(latent_dim=args.noise_dim, size=1000, mode='test', transform=args.transform, truncate=args.truncate)
+        test_set = MultiNormaldataset(latent_dim=args.noise_dim, size=1000, channels = args.simu_channels, mode='test', transform=args.transform, truncate=args.truncate, simu_dim=args.simu_dim)
         #test_loader = data.DataLoader(test_set, batch_size=args.batch_size, num_workers=args.num_workers, shuffle=True)
 
     else:

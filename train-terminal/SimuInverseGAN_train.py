@@ -4,12 +4,13 @@ import os
 import argparse
 
 os.system(f"CUDA_VISIBLE_DEVICES=0,1,2,3,4,5,6,7 python ../train_inverseGAN.py \
---gpu 0 \
+--gpu 1 \
 --dist-url 'tcp://localhost:4321' \
 --world-size 1 \
 --dataset Simulation \
 --transform True \
---truncate True \
+--simu_dim 150 \
+--simu_channels 3 \
 --gen_model my_gen \
 --dis_model my_dis \
 --heads 5 \
@@ -24,4 +25,4 @@ os.system(f"CUDA_VISIBLE_DEVICES=0,1,2,3,4,5,6,7 python ../train_inverseGAN.py \
 --batch_size 256 \
 --epochs 1500 \
 --print_freq 50 \
---exp_name GauGANs-Simu-Trans-Trun")
+--exp_name GauGANs-Simu-Trans")

@@ -26,5 +26,5 @@ os.system(f"CUDA_VISIBLE_DEVICES=0,1,2,3,4,5,6,7 python ../train_GAN.py \
 --epochs 1500 \
 --eval_num 500 \
 --print_freq 50 \
---checkpoint_best_PATH '/home/panq/python_project/GaussianGANs/train-terminal/save/GANs-simulation-trans-trun' \
---exp_name Simu-Trans-Trun")
+--checkpoint_best_PATH '/home/panq/python_project/GaussianGANs/train-terminal/save/GauGANs-trans-trun' \
+--exp_name GANs-Simu-Trans-Trun")

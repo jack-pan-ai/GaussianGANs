@@ -67,6 +67,18 @@ def parse_args():
         help='Truncate on Generated Multivariate Gaussian Distribution'
     )
     parser.add_argument(
+        '--simu_dim',
+        type = int,
+        default= 150,
+        help='The dimension of simulated Gaussian Random Fields'
+    )
+    parser.add_argument(
+        '--simu_channels',
+        type=int,
+        default=3,
+        help='The channels of simulated Gaussian Random Fields'
+    )
+    parser.add_argument(
         '--g_lr',
         type=float,
         default=0.0001,

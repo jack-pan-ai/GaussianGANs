@@ -114,9 +114,10 @@ def main_worker(gpu, ngpus_per_node, args):
     print('------------------------------------------------------------')
 
     # [batch_size, latent dim]
-    train_set = MultiNormaldataset(latent_dim=args.noise_dim, size=10000, mode='train')
+    # Standard Multivariate Gaussian distribution
+    train_set = MultiNormaldataset(latent_dim=args.noise_dim, size=100000, mode='train', simu_dim=args.simu_dim)
     train_loader = DataLoader(train_set, batch_size=args.batch_size, num_workers=args.num_workers, shuffle=True)
-    #test_set = MultiNormaldataset(latent_dim=args.noise_dim, size = 1000, mode='test')
+    #test_set = MultiNormaldataset(latent_dim=args.noise_dim, size = 1000, mode='test', simu_dim=args.simu_dim)
     #test_loader = DataLoader(test_set, batch_size=args.batch_size, num_workers=args.num_workers, shuffle=True)
 
     # [batch_size, channles, seq-len]
@@ -127,7 +128,7 @@ def main_worker(gpu, ngpus_per_node, args):
                                         one_hot_encode=False, data_mode='Train', single_class=True,
                                         class_name=args.class_name, augment_times=args.augment_times)
     elif args.dataset =='Simulation':
-        img_set = MultiNormaldataset(latent_dim=args.noise_dim, size=10000, mode='train', transform=args.transform, truncate=args.truncate)
+        img_set = MultiNormaldataset(latent_dim=args.noise_dim, channels = args.simu_channels, size=10000, mode='train', transform=args.transform, truncate=args.truncate, simu_dim=args.simu_dim)
     else:
         print('Please input the correct dataset name: UniMiB or Simulation.')
         raise TypeError
@@ -265,7 +266,7 @@ def main_worker(gpu, ngpus_per_node, args):
 
     # wandb ai monitoring
     # project_name = 'loss: ' + args.loss + ', n_gen: ' + str(args.n_gen) + ', n_dis: ' + str(args.n_dis)
-    wandb.init(project=args.dataset + str('GaussianGANs'), entity="qilong77", name=args.exp_name)
+    wandb.init(project=args.dataset + str('GaussianGANs-v2'), entity="qilong77", name=args.exp_name)
     wandb.config = {
         "epochs": int(args.epochs) - int(start_epoch),
         "batch_size": args.batch_size
