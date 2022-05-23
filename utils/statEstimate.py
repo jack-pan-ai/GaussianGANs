@@ -36,7 +36,7 @@ def diff_cor(x):
     p_cor = np.corrcoef(x.T)
     cor_dis = np.sqrt(np.sum((p_cor - np.diag(np.ones(n_fea)))**2)) / np.sqrt(n_fea)
     # variance and mean: moment dis
-    moment_dis = np.sqrt((x_mean - 0)**2 / n_fea + (x_std - 1)**2 / n_fea)
+    moment_dis = np.sqrt((x_mean - 0)**2 + (x_std - 1)**2)/ n_fea
     # compute distance
     dis = p_dis + cor_dis + moment_dis
 

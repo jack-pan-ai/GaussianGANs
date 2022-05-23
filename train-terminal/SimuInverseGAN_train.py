@@ -9,6 +9,7 @@ os.system(f"CUDA_VISIBLE_DEVICES=0,1,2,3,4,5,6,7 python ../train_inverseGAN.py \
 --world-size 1 \
 --dataset Simulation \
 --transform True \
+--truncate True \
 --gen_model my_gen \
 --dis_model my_dis \
 --heads 5 \
@@ -23,4 +24,4 @@ os.system(f"CUDA_VISIBLE_DEVICES=0,1,2,3,4,5,6,7 python ../train_inverseGAN.py \
 --batch_size 256 \
 --epochs 1500 \
 --print_freq 50 \
---exp_name GauGANs-Simu-Trans")
+--exp_name GauGANs-Simu-Trans-Trun")

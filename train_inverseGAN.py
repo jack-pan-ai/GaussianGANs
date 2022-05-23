@@ -265,13 +265,13 @@ def main_worker(gpu, ngpus_per_node, args):
 
     # wandb ai monitoring
     # project_name = 'loss: ' + args.loss + ', n_gen: ' + str(args.n_gen) + ', n_dis: ' + str(args.n_dis)
-    wandb.init(project=args.dataset, entity="qilong77", name=args.exp_name)
+    wandb.init(project=args.dataset + str('GaussianGANs'), entity="qilong77", name=args.exp_name)
     wandb.config = {
         "epochs": int(args.epochs) - int(start_epoch),
         "batch_size": args.batch_size
     }
 
-    dis_best, p_dis_best, cor_dis_best, moment_dis_best = 8., 1., 2., 6.
+    dis_best, p_dis_best, cor_dis_best, moment_dis_best = 99, 99, 99, 99
 
     # train loop
     for epoch in range(int(start_epoch), int(args.epochs)):
@@ -304,11 +304,14 @@ def main_worker(gpu, ngpus_per_node, args):
                     if dis < dis_best:
                         dis_best = dis
                         is_best_dis = True
-                    elif p_dis < p_dis_best:
-                        p_dis_best = True
-                    elif cor_dis < cor_dis_best:
+                    if p_dis < p_dis_best:
+                        p_dis_best = p_dis
+                        is_best_p = True
+                    if cor_dis < cor_dis_best:
+                        cor_dis_best = cor_dis
                         is_best_cor = True
-                    elif moment_dis < moment_dis_best:
+                    if moment_dis < moment_dis_best:
+                        moment_dis_best = moment_dis
                         is_best_moment = True
 
                 visu_pca = plt.imread(

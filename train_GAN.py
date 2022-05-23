@@ -285,7 +285,7 @@ def main_worker(gpu, ngpus_per_node, args):
 
     # wandb ai monitoring
     project_name = 'loss: ' + args.loss + ', n_gen: ' + str(args.n_gen) + ', n_dis: '+ str(args.n_dis)
-    wandb.init(project=args.exp_name, entity="qilong77", name = project_name)
+    wandb.init(project=args.exp_name + str('GANs'), entity="qilong77", name = project_name)
     wandb.config = {
         "epochs": int(args.epochs) - int(start_epoch),
         "batch_size": args.batch_size
@@ -335,11 +335,14 @@ def main_worker(gpu, ngpus_per_node, args):
                     if dis < dis_best:
                         dis_best = dis
                         is_best_dis = True
-                    elif p_dis < p_dis_best:
-                        p_dis_best = True
-                    elif cor_dis < cor_dis_best:
+                    if p_dis < p_dis_best:
+                        p_dis_best = p_dis
+                        is_best_p = True
+                    if cor_dis < cor_dis_best:
+                        cor_dis_best = cor_dis
                         is_best_cor = True
-                    elif moment_dis < moment_dis_best:
+                    if moment_dis < moment_dis_best:
+                        moment_dis_best = moment_dis
                         is_best_moment = True
 
                 # wandb for generated data
