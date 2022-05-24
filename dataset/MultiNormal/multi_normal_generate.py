@@ -1,175 +1,69 @@
 from numpy.random import multivariate_normal
 import numpy as np
-import random
 import pickle
 import os
 from torch.utils.data import Dataset
 import torch
 
-def transform_Gaussian(latent_dim, size, transform, truncate, channels=1):
-    length_whole = latent_dim*channels
-    mean = np.random.uniform(1, 10, size=length_whole)
-    # let covariance matrix to be positive-semidefinite
-    cov = np.random.uniform(-7, 7, size=length_whole ** 2).reshape(length_whole, length_whole)
-    cov = np.dot(cov, cov.T)
-    cov = cov + cov.T
-    x = multivariate_normal(mean=mean, cov=cov, size=size)
+def _simu_transform_Gaussian(latent_dim, size, transform, truncate, mode, channels=1):
 
-    # used to add the linearity in our GRF
-    if False:
-        linear_trans = np.random.random((length_whole//2)**2).reshape(length_whole//2, length_whole//2)
-        x_trans = np.matmul(x[:, 0:(length_whole//2)], linear_trans)
-        x = np.concatenate([x[:, 0:(length_whole//2)], x_trans], axis=1)
-        shuffle_no = np.arange(length_whole)
-        random.shuffle(shuffle_no)
-        x = x[:, shuffle_no].reshape(-1, length_whole)
+    data_path = './MultiNormalDataset/' + mode + \
+                '/data' + ('_transform' if transform else '') +  \
+                ('_truncate' if truncate else '') + ('_Dim' + str(latent_dim)) + \
+                ('_Chan' + str(channels)) + '.pkl'
 
-    if transform:
-        # non-linear transformation
-        x = 2 * np.log(np.abs(x)) + 1
-    if truncate:
-        # truncation
-        c = 17.
-        x[x >= c] = c
-    # reshape the dataset
-    x = x.reshape(-1, channels, latent_dim)
+    if not os.path.exists(data_path):
+        length_whole = latent_dim * channels
+        if (not transform and not truncate):
+            mean = np.zeros(length_whole, dtype=float)
+            cor = np.diag(np.ones(length_whole, dtype=float))
+        else:
+            mean = np.random.uniform(1, 4, size=length_whole)
+            # let covariance matrix to be positive-semidefinite
+            cov = np.random.uniform(-1, 1, size=length_whole ** 2).reshape(length_whole, length_whole)
+            cov = np.dot(cov, cov.T)
+            cov = cov + cov.T
+            var = np.diag(1 / np.sqrt(np.diag(cov)))
+            cor = np.matmul(var, cov)
+            cor = np.matmul(cor, var)
+        x = multivariate_normal(mean=mean, cov=cor, size=size)
 
-    return x
+        if transform:
+            # non-linear transformation
+            x = np.exp(x) + 1
+        if truncate:
+            # truncation (0, +inf)
+            c = max(np.abs(x)) / 1.2
+            x[x >= c] = c
+        # reshape the dataset
+        x = x.reshape(-1, channels, latent_dim)
+
+        data_GRF = {'x': x, 'mean': mean, 'cor': cor}
+
+        with open(data_path, 'wb') as f:
+            pickle.dump(data_GRF, f)
+        print('Simulation for ' + mode + ' dataset finished!' + ' Path: ' + data_path + ' Shape:', x.shape)
+
+        return x, mean, cor
+    else:
+        with open(data_path, 'rb') as f:
+            data_GRF = pickle.load(f)
+        x, mean, cor = data_GRF['x'], data_GRF['mean'], data_GRF['cor']
+        print('Dataset exists: ' + data_path)
+        print(mode + ' Shape: ', x.shape)
+        return x, mean, cor
 
 
 
 class MultiNormaldataset(Dataset):
-    def __init__(self, latent_dim = 64, size = 100000, channels = 1,mode = 'train', transform = False, truncate = False, simu_dim=150):
-        if mode == 'train':
-            if not os.path.exists('./MultiNormalDataset/train'):
-                os.makedirs('MultiNormalDataset/train')
-            if (not transform and not truncate):
-                self.simulate_multi_normal(latent_dim, size, channels=channels, transform = False, truncate = False, simu_dim=simu_dim)
-                with open("./MultiNormalDataset/train/multinormal_data" +".pkl", 'rb') as f:
-                    self.x = pickle.load(f)
-            elif (transform and truncate):
-                self.simulate_multi_normal(latent_dim, size, channels=channels, transform=True, truncate=True, simu_dim=simu_dim)
-                with open("./MultiNormalDataset/train/multinormal_data" + str('_transform') + str('_truncate') + ".pkl", 'rb') as f:
-                    self.x = pickle.load(f)
-            elif (transform):
-                self.simulate_multi_normal(latent_dim, size, channels=channels, transform=True, truncate=False, simu_dim=simu_dim)
-                with open("./MultiNormalDataset/train/multinormal_data" + str('_transform') + ".pkl", 'rb') as f:
-                    self.x = pickle.load(f)
-            else:
-                self.simulate_multi_normal(latent_dim, size, channels=channels, transform=False, truncate=True, simu_dim=simu_dim)
-                with open("./MultiNormalDataset/train/multinormal_data" + str('_truncate') + ".pkl", 'rb') as f:
-                    self.x = pickle.load(f)
-        elif mode == 'test':
-            if not os.path.exists('./MultiNormalDataset/test'):
-                os.makedirs('MultiNormalDataset/test')
-            if (not transform and not truncate):
-                self.simulate_multi_normal(latent_dim, size, channels=channels, mode ='test', transform=False, truncate=False, simu_dim=simu_dim)
-                with open("./MultiNormalDataset/test/multinormal_data" + ".pkl", 'rb') as f:
-                    self.x = pickle.load(f)
-            elif (transform and truncate):
-                self.simulate_multi_normal(latent_dim, size, channels=channels, mode ='test', transform=True, truncate=True, simu_dim=simu_dim)
-                with open("./MultiNormalDataset/test/multinormal_data" + str('_transform') + str('_truncate') + ".pkl", 'rb') as f:
-                    self.x = pickle.load(f)
-            elif (transform):
-                self.simulate_multi_normal(latent_dim, size, channels=channels, mode ='test', transform=True, truncate=False, simu_dim=simu_dim)
-                with open("./MultiNormalDataset/test/multinormal_data" + str('_transform') + ".pkl", 'rb') as f:
-                    self.x = pickle.load(f)
-            else:
-                self.simulate_multi_normal(latent_dim, size, channels=channels, mode ='test', transform=False, truncate=True, simu_dim=simu_dim)
-                with open("./MultiNormalDataset/test/multinormal_data" + str('_truncate') + ".pkl", 'rb') as f:
-                    self.x = pickle.load(f)
+    def __init__(self, latent_dim, size, mode, channels=None, simu_dim=None, transform = False, truncate = False):
+        assert mode == 'train' or mode == 'test', 'Please input the right mode: train or test.'
+        if not os.path.exists('./MultiNormalDataset/' + mode):
+            os.makedirs('MultiNormalDataset/' + mode)
+        if (not transform and not truncate):
+            self.x, self.mean, self.cor = _simu_transform_Gaussian(latent_dim, size, transform, truncate, mode, channels)
         else:
-            raise InterruptedError('Please choose test or train mode')
-
-    def simulate_multi_normal(self, latent_dim, size, simu_dim, channels, mode = 'train', transform=False, truncate=False):
-        if mode == 'train':
-            if (not transform and not truncate):
-                if not os.path.exists('./MultiNormalDataset/train/multinormal_data.pkl'):
-                    mean = np.zeros(latent_dim, dtype=float)
-                    cov = np.diag(np.ones(latent_dim, dtype=float))
-
-                    x = multivariate_normal(mean=mean, cov=cov, size=size)
-                    x = x.reshape(-1, 1, latent_dim)
-                    with open('./MultiNormalDataset/train/multinormal_data.pkl', 'wb') as f:
-                        pickle.dump(x, f)
-                    print('(Standard Multinormal Dataset) Simulation for train dataset finished! and the shape is ', x.shape)
-                else:
-                    print("(Standard Multinormal Dataset) Train Dataset exist!")
-            elif (transform and truncate):
-                if not os.path.exists('./MultiNormalDataset/train/multinormal_data' + str('_transform') + str('_truncate') +'.pkl'):
-                    #mean = np.zeros(latent_dim, dtype=float)
-                    x = transform_Gaussian(simu_dim, size, transform, truncate, channels)
-                    with open('./MultiNormalDataset/train/multinormal_data' + str('_transform') + str('_truncate') + '.pkl', 'wb') as f:
-                        pickle.dump(x, f)
-                    print('(Transformed and Truncated Standard Multinormal Dataset) Simulation for train dataset finished! and the shape is ',
-                          x.shape)
-                else:
-                    print("(Transformed and Truncated Standard Multinormal Dataset) Train Dataset exist!")
-            elif (transform):
-                if not os.path.exists('./MultiNormalDataset/train/multinormal_data' + str('_transform') +'.pkl'):
-                    #mean = np.zeros(latent_dim, dtype=float)
-                    x = transform_Gaussian(simu_dim, size, transform, truncate, channels)
-                    with open('./MultiNormalDataset/train/multinormal_data' + str('_transform') + '.pkl', 'wb') as f:
-                        pickle.dump(x, f)
-                    print('(Transformed Standard Multinormal Dataset) Simulation for train dataset finished! and the shape is ',
-                          x.shape)
-                else:
-                    print("(Transformed Standard Multinormal Dataset) Train Dataset exist!")
-            else:
-                if not os.path.exists('./MultiNormalDataset/train/multinormal_data' + str('_truncate') +'.pkl'):
-                    #mean = np.zeros(latent_dim, dtype=float)
-                    x = transform_Gaussian(simu_dim, size, transform, truncate, channels)
-                    with open('./MultiNormalDataset/train/multinormal_data' + str('_truncate') + '.pkl', 'wb') as f:
-                        pickle.dump(x, f)
-                    print('(Truncated Standard Multinormal Dataset) Simulation for train dataset finished! and the shape is ',
-                          x.shape)
-                else:
-                    print("(Truncated Standard Multinormal Dataset) Train Dataset exist!")
-        else:
-            if (not transform and not truncate):
-                if not os.path.exists('./MultiNormalDataset/test/multinormal_data.pkl'):
-                    mean = np.zeros(latent_dim, dtype=float)
-                    cov = np.diag(np.ones(latent_dim, dtype=float))
-
-                    x = multivariate_normal(mean=mean, cov=cov, size=size)
-                    x = x.reshape(-1, 1, latent_dim)
-                    with open('./MultiNormalDataset/test/multinormal_data.pkl', 'wb') as f:
-                        pickle.dump(x, f)
-                    print('(Standard Multinormal Dataset) Simulation for test dataset finished! and the shape is ',
-                          x.shape)
-                else:
-                    print("(Standard Multinormal Dataset) Test Dataset exist!")
-            elif (transform and truncate):
-                if not os.path.exists(
-                        './MultiNormalDataset/test/multinormal_data' + str('_transform') + str('_truncate') + '.pkl'):
-                    x = transform_Gaussian(simu_dim, size, transform, truncate, channels)
-                    with open('./MultiNormalDataset/test/multinormal_data' + str('_transform') + str('_truncate') + '.pkl', 'wb') as f:
-                        pickle.dump(x, f)
-                    print(
-                        '(Transformed and Truncated Standard Multinormal Dataset) Simulation for test dataset finished! and the shape is ',
-                        x.shape)
-                else:
-                    print("(Transformed and Truncated Standard Multinormal Dataset) Test Dataset exist!")
-            elif (transform):
-                if not os.path.exists('./MultiNormalDataset/test/multinormal_data' + str('_transform') + '.pkl'):
-                    x = transform_Gaussian(simu_dim, size, transform, truncate, channels)
-                    with open('./MultiNormalDataset/test/multinormal_data' + str('_transform') + '.pkl', 'wb') as f:
-                        pickle.dump(x, f)
-                    print(
-                        '(Transformed Standard Multinormal Dataset) Simulation for test dataset finished! and the shape is ',
-                        x.shape)
-                else:
-                    print("(Transformed Standard Multinormal Dataset) Test Dataset exist!")
-            else:
-                if not os.path.exists('./MultiNormalDataset/test/multinormal_data' + str('_truncate') + '.pkl'):
-                    x = transform_Gaussian(simu_dim, size, transform, truncate, channels)
-                    with open('./MultiNormalDataset/test/multinormal_data' + str('_truncate') + '.pkl', 'wb') as f:
-                        pickle.dump(x, f)
-                    print(
-                        '(Truncated Standard Multinormal Dataset) Simulation for test dataset finished! and the shape is ',
-                        x.shape)
-                else:
-                    print("(Truncated Standard Multinormal Dataset) Test Dataset exist!")
+            self.x, self.mean, self.cor = _simu_transform_Gaussian(simu_dim, size, transform, truncate, mode, channels)
 
     def __len__(self):
         return self.x.shape[0]

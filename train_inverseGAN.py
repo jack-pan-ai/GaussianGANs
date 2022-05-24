@@ -115,7 +115,7 @@ def main_worker(gpu, ngpus_per_node, args):
 
     # [batch_size, latent dim]
     # Standard Multivariate Gaussian distribution
-    train_set = MultiNormaldataset(latent_dim=args.noise_dim, size=10000, mode='train', simu_dim=args.simu_dim)
+    train_set = MultiNormaldataset(latent_dim=args.noise_dim, size=10000, mode = 'train', channels=1)
     train_loader = DataLoader(train_set, batch_size=args.batch_size, num_workers=args.num_workers, shuffle=True)
     #test_set = MultiNormaldataset(latent_dim=args.noise_dim, size = 1000, mode='test', simu_dim=args.simu_dim)
     #test_loader = DataLoader(test_set, batch_size=args.batch_size, num_workers=args.num_workers, shuffle=True)
@@ -128,7 +128,15 @@ def main_worker(gpu, ngpus_per_node, args):
                                         one_hot_encode=False, data_mode='Train', single_class=True,
                                         class_name=args.class_name, augment_times=args.augment_times)
     elif args.dataset =='Simulation':
-        img_set = MultiNormaldataset(latent_dim=args.noise_dim, channels = args.simu_channels, size=1000, mode='train', transform=args.transform, truncate=args.truncate, simu_dim=args.simu_dim)
+        img_set = MultiNormaldataset(
+            latent_dim=args.noise_dim, size=100000,
+            mode='train', channels=args.simu_channels,
+            simu_dim=args.simu_dim,
+            transform=args.transform, truncate=args.truncate
+        )
+        ver_set = MultiNormaldataset(latent_dim=args.noise_dim, size=10000, mode='test',
+                                      channels=args.simu_channels, transform=args.transform,
+                                      truncate=args.truncate, simu_dim=args.simu_dim)
     else:
         print('Please input the correct dataset name: UniMiB or Simulation.')
         raise TypeError
@@ -266,7 +274,7 @@ def main_worker(gpu, ngpus_per_node, args):
 
     # wandb ai monitoring
     # project_name = 'loss: ' + args.loss + ', n_gen: ' + str(args.n_gen) + ', n_dis: ' + str(args.n_dis)
-    wandb.init(project=args.dataset + str('GaussianGANs-v2'), entity="qilong77", name=args.exp_name +
+    wandb.init(project=args.dataset + str('GaussianGANs-v3.1'), entity="qilong77", name=args.exp_name +
                                                                                       'Dim: ' +
                                                                                       str(args.simu_dim) +
                                                                                       'Chan: ' +
@@ -292,16 +300,32 @@ def main_worker(gpu, ngpus_per_node, args):
                 # load_params(gen_net, gen_avg_param, args, mode="cpu")
                 # load_params(gen_net, backup_param, args)
                 with torch.no_grad():
-                    imgs_s = torch.from_numpy(img_set[:args.eval_num]).type(torch.cuda.FloatTensor).cuda(args.gpu)
+                    se_no = torch.randint(0, len(img_set), [len(img_set)//50])
+                    img_s = torch.from_numpy(img_set[se_no]).type(torch.cuda.FloatTensor).cuda(args.gpu)
+                    gen_noise = gen_net(img_s).detach().to('cpu')
+                if args.dataset == 'Simulation':
+                    ver_s = torch.from_numpy(ver_set[:]).type(torch.cuda.FloatTensor).cuda(args.gpu)
+                    gen_noise_ver = gen_net(ver_s).detach().to('cpu')
 
-                    gen_noise = gen_net(imgs_s).detach().to('cpu')
                 # visuliztion: pca or t-sne plot or heatmap or qqplot
-                visualization(ori_data=train_set[:args.eval_num], generated_data=gen_noise, analysis='pca',
+                visualization(ori_data=train_set[:args.eval_num], generated_data=gen_noise[:args.eval_num], analysis='pca',
                               save_name=args.exp_name, epoch=epoch, args=args)
                 qqplot(gen_noise.squeeze(1), epoch=epoch, args=args, save_name=args.exp_name)
                 heatmap_cor(gen_noise.squeeze(1), epoch=epoch, args=args, save_name=args.exp_name)
+
+                if args.dataset == 'Simulation':
+                    # verification
+                    name_ground_truth = args.exp_name + str('ground')
+                    # visuliztion: pca or t-sne plot or heatmap or qqplot
+                    visualization(ori_data=train_set[:args.eval_num], generated_data=gen_noise_ver[:args.eval_num],
+                                  analysis='pca',
+                                  save_name=name_ground_truth, epoch=epoch, args=args)
+                    qqplot(gen_noise_ver.squeeze(1), epoch=epoch, args=args, save_name=name_ground_truth)
+                    heatmap_cor(gen_noise_ver.squeeze(1), epoch=epoch, args=args, save_name=name_ground_truth)
+                    dis_ground, p_dis_ground, cor_dis_ground, moment_dis_ground = diff_cor(gen_noise_ver.squeeze(1))
+
                 # correlation matrix distance
-                if epoch < 100:
+                if epoch < 100: # Used as burnin
                     is_best_dis, is_best_p, is_best_cor, is_best_moment = False, False, False, False
                     dis, p_dis, cor_dis, moment_dis = diff_cor(gen_noise.squeeze(1))
                 else:
@@ -325,16 +349,41 @@ def main_worker(gpu, ngpus_per_node, args):
                     os.path.join(args.path_helper['log_path_img_qqplot'], f'{args.exp_name}_epoch_{epoch + 1}.png'))
                 visu_heatmap = plt.imread(
                     os.path.join(args.path_helper['log_path_img_heatmap'], f'{args.exp_name}_epoch_{epoch + 1}.png'))
+                if args.dataset == 'Simulation':
+                    visu_pca_ground = plt.imread(
+                        os.path.join(args.path_helper['log_path_img_pca'], f'{name_ground_truth}_epoch_{epoch + 1}.png'))
+                    visu_qqplot_ground = plt.imread(
+                        os.path.join(args.path_helper['log_path_img_qqplot'], f'{name_ground_truth}_epoch_{epoch + 1}.png'))
+                    visu_heatmap_ground = plt.imread(
+                        os.path.join(args.path_helper['log_path_img_heatmap'],
+                                     f'{name_ground_truth}_epoch_{epoch + 1}.png'))
+
+                # wandb monitor
                 img_visu_pca = wandb.Image(visu_pca, caption="Epoch: " + str(epoch))
                 img_visu_qqplot = wandb.Image(visu_qqplot, caption="Epoch: " + str(epoch))
                 img_visu_heatmap = wandb.Image(visu_heatmap, caption="Epoch: " + str(epoch))
+                if args.dataset == 'Simulation':
+                    img_visu_pca_ground = wandb.Image(visu_pca_ground, caption="Epoch: " + str(epoch))
+                    img_visu_qqplot_ground = wandb.Image(visu_qqplot_ground, caption="Epoch: " + str(epoch))
+                    img_visu_heatmap_ground = wandb.Image(visu_heatmap_ground, caption="Epoch: " + str(epoch))
                 wandb.log({'PCA': img_visu_pca,
                            'QQplot': img_visu_qqplot,
                            'Heatmap': img_visu_heatmap})
+                if args.dataset == 'Simulation':
+                    wandb.log({'Ground-truth PCA': img_visu_pca_ground,
+                               'Ground-truth QQplot': img_visu_qqplot_ground,
+                               'Ground-truth Heatmap': img_visu_heatmap_ground})
                 wandb.log({'Distance': dis,
                            'p-value': p_dis,
                            'cor_distance': cor_dis,
                            'moment_dis': moment_dis})
+                if args.dataset == 'Simulation':
+                    wandb.log({'Ground_Distance': dis_ground,
+                               'Ground_p-value': p_dis_ground,
+                               'Ground_cor_distance': cor_dis_ground,
+                               'Ground_moment_dis': moment_dis_ground,
+                               })
+
                 #visu_pca = rearrange(visu_pca, 'h w c -> c h w')
                 # writer.add_image('Comparison for original and generative data based on PCA', visu_pca, epoch + 1)
                 # writer.add_scalar('Correlation matrix distance using determinant', dis)

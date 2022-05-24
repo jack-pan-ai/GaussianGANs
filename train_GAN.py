@@ -128,9 +128,13 @@ def main_worker(gpu, ngpus_per_node, args):
                                        class_name=args.class_name)
         #test_loader = data.DataLoader(test_set, batch_size=args.batch_size, num_workers=args.num_workers, shuffle=True)
     elif args.dataset == 'Simulation':
-        train_set = MultiNormaldataset(latent_dim=args.noise_dim, size=10000, channels = args.simu_channels, mode='train', transform=args.transform, truncate=args.truncate, simu_dim=args.simu_dim)
+        train_set = MultiNormaldataset(latent_dim=args.noise_dim, size=100000,  mode='train',
+                                       channels = args.simu_channels,  simu_dim=args.simu_dim,
+                                       transform=args.transform, truncate=args.truncate)
         train_loader = data.DataLoader(train_set, batch_size=args.batch_size, num_workers=args.num_workers, shuffle=True)
-        test_set = MultiNormaldataset(latent_dim=args.noise_dim, size=1000, channels = args.simu_channels, mode='test', transform=args.transform, truncate=args.truncate, simu_dim=args.simu_dim)
+        test_set = MultiNormaldataset(latent_dim=args.noise_dim, size=10000, mode='test',
+                                      channels = args.simu_channels, transform=args.transform,
+                                      truncate=args.truncate, simu_dim=args.simu_dim)
         #test_loader = data.DataLoader(test_set, batch_size=args.batch_size, num_workers=args.num_workers, shuffle=True)
 
     else:
@@ -284,14 +288,18 @@ def main_worker(gpu, ngpus_per_node, args):
     print('------------------------------------------------------------')
 
     # wandb ai monitoring
-    project_name = 'loss: ' + args.loss + ', n_gen: ' + str(args.n_gen) + ', n_dis: '+ str(args.n_dis)
-    wandb.init(project=args.exp_name + str('GANs'), entity="qilong77", name = project_name)
+    # project_name = 'loss: ' + args.loss + ', n_gen: ' + str(args.n_gen) + ', n_dis: '+ str(args.n_dis)
+    wandb.init(project=args.dataset + str('GANs-v3'), entity="qilong77", name = args.exp_name +
+                                                                                      'Dim: ' +
+                                                                                      str(args.simu_dim) +
+                                                                                      'Chan: ' +
+                                                                                      str(args.simu_channels))
     wandb.config = {
         "epochs": int(args.epochs) - int(start_epoch),
         "batch_size": args.batch_size
     }
 
-    dis_best, p_dis_best, cor_dis_best, moment_dis_best = 8., 1., 2., 6.
+    dis_best, p_dis_best, cor_dis_best, moment_dis_best = 99, 99, 99, 99
 
     # train loop
     for epoch in range(int(start_epoch), int(args.epochs)):
@@ -309,21 +317,51 @@ def main_worker(gpu, ngpus_per_node, args):
                     # sample_imgs is on GPU device
                     sample_imgs = gen_net(fixed_z).detach()
                 save_samples(args, fixed_z[0].reshape(1, -1), epoch + 1, gen_net, writer_dict)
+
+                if args.dataset == 'Simulation':
+                    # inverse transformation
+                    # [batch_size, channels, seq_length]
+                    ori_imgs = torch.log(sample_imgs.to('cpu').numpy() - 1)
+                    # [batch_size, channels, seq_length] -> [batch_size, channels * seq_length]
+                    ori_imgs = rearrange(ori_imgs, 'b c l -> b (c l)')
+
+                    mean_est = np.mean(ori_imgs, axis=0)
+                    mean_dis = np.sqrt(np.sum(mean_est - train_set.mean)**2)
+                    wandb.log({
+                        'Mean distance (L2)': mean_dis
+                    })
+
+                    cov_dis = np.sum((np.corrcoef(ori_imgs.T) - train_set.cor)**2)
+                    wandb.log({
+                        'Correlation matrix distance (L2)': cov_dis
+                    })
+
+
+
                 # visualization for generated data
-                visualization(ori_data=train_set[:args.eval_num], generated_data=sample_imgs.to('cpu'), analysis='pca',
+                visualization(ori_data=train_set[:args.eval_num],
+                              generated_data=sample_imgs.to('cpu'), analysis='pca',
                               save_name=args.exp_name, epoch=epoch, args=args)
                 with torch.no_grad():
                     sample_trans_imgs = gen_inv_net(sample_imgs.to('cuda:'+str(args.gpu))).detach().to('cpu')
-                qqplot(sample_trans_imgs.squeeze(1), epoch=epoch, args=args, save_name=args.exp_name)
-                heatmap_cor(sample_trans_imgs.squeeze(1), epoch=epoch, args=args, save_name=args.exp_name)
-                # visualization for ground truth data
+                qqplot(sample_trans_imgs.squeeze(1), epoch=epoch, args=args,
+                       save_name=args.exp_name)
+                heatmap_cor(sample_trans_imgs.squeeze(1), epoch=epoch, args=args,
+                            save_name=args.exp_name)
+
+                # visualization
+                # Ground truth data
                 name_ground_truth = args.exp_name + str('ground')
-                visualization(ori_data=train_set[:args.eval_num], generated_data=test_set[:(len(test_set) - 1)], analysis='pca',
-                              save_name=name_ground_truth, epoch=epoch, args=args)
+                visualization(ori_data=train_set[:args.eval_num],
+                              generated_data=test_set[:(len(test_set) - 1)],
+                              analysis='pca', save_name=name_ground_truth,
+                              epoch=epoch, args=args)
                 with torch.no_grad():
                     sample_trans_imgs_ground = gen_inv_net(torch.from_numpy(test_set[:(len(test_set) - 1)]).type(torch.cuda.FloatTensor).cuda(args.gpu, non_blocking=True)).detach().to('cpu')
-                qqplot(sample_trans_imgs_ground.squeeze(1), epoch=epoch, args=args, save_name=name_ground_truth)
-                heatmap_cor(sample_trans_imgs_ground.squeeze(1), epoch=epoch, args=args, save_name=name_ground_truth)
+                qqplot(sample_trans_imgs_ground.squeeze(1), epoch=epoch, args=args,
+                       save_name=name_ground_truth)
+                heatmap_cor(sample_trans_imgs_ground.squeeze(1), epoch=epoch, args=args,
+                            save_name=name_ground_truth)
 
                 dis_ground, p_dis_ground, cor_dis_ground, moment_dis_ground = diff_cor(sample_trans_imgs_ground.squeeze(1))
 

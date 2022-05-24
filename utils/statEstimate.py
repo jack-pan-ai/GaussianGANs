@@ -59,6 +59,7 @@ def heatmap_cor(x, epoch, args = None, save_name=None):
         raise TypeError
 
     pear_cor = np.corrcoef(x.T)
+    pear_cor = np.abs(pear_cor)
     fig, ax = plt.subplots()
     sns.heatmap(pear_cor, vmin=0, vmax=1)
     ax.set_title('Heatmap for correlation matrix')
