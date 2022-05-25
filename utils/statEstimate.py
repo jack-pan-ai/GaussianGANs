@@ -26,7 +26,10 @@ def diff_cor(x):
     x_std = np.sum(np.std(x, axis=0))
     # normality
     count = 0
-    pvalues_s = [stats.shapiro(x[:, i]) for i in range(n_fea)]
+    if x.shape[0] > 4900:
+        pvalues_s = [stats.shapiro(x[:4900, i]) for i in range(n_fea)]
+    else:
+        pvalues_s = [stats.shapiro(x[:, i]) for i in range(n_fea)]
     pvalues_da = [stats.normaltest(x[:, i]) for i in range(n_fea)]
     for pvs, pvd in zip(pvalues_s, pvalues_da):
         if pvs[1] > 0.95 or pvd[1] > 0.95:

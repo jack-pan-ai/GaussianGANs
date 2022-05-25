@@ -129,12 +129,12 @@ def main_worker(gpu, ngpus_per_node, args):
                                         class_name=args.class_name, augment_times=args.augment_times)
     elif args.dataset =='Simulation':
         img_set = MultiNormaldataset(
-            latent_dim=args.noise_dim, size=100000,
+            latent_dim=args.noise_dim, size=100000,  # large enough to get a approximate sampling space
             mode='train', channels=args.simu_channels,
             simu_dim=args.simu_dim,
             transform=args.transform, truncate=args.truncate
         )
-        ver_set = MultiNormaldataset(latent_dim=args.noise_dim, size=10000, mode='test',
+        ver_set = MultiNormaldataset(latent_dim=args.noise_dim, size=args.eval_num, mode='test',
                                       channels=args.simu_channels, transform=args.transform,
                                       truncate=args.truncate, simu_dim=args.simu_dim)
     else:
@@ -274,7 +274,7 @@ def main_worker(gpu, ngpus_per_node, args):
 
     # wandb ai monitoring
     # project_name = 'loss: ' + args.loss + ', n_gen: ' + str(args.n_gen) + ', n_dis: ' + str(args.n_dis)
-    wandb.init(project=args.dataset + str('GaussianGANs-v3.1'), entity="qilong77", name=args.exp_name +
+    wandb.init(project=args.dataset + str('GaussianGANs'), entity="qilong77", name=args.exp_name +
                                                                                       'Dim: ' +
                                                                                       str(args.simu_dim) +
                                                                                       'Chan: ' +
@@ -300,7 +300,7 @@ def main_worker(gpu, ngpus_per_node, args):
                 # load_params(gen_net, gen_avg_param, args, mode="cpu")
                 # load_params(gen_net, backup_param, args)
                 with torch.no_grad():
-                    se_no = torch.randint(0, len(img_set), [len(img_set)//50])
+                    se_no = torch.randint(0, len(img_set), [args.eval_num])
                     img_s = torch.from_numpy(img_set[se_no]).type(torch.cuda.FloatTensor).cuda(args.gpu)
                     gen_noise = gen_net(img_s).detach().to('cpu')
                 if args.dataset == 'Simulation':
@@ -370,18 +370,18 @@ def main_worker(gpu, ngpus_per_node, args):
                            'QQplot': img_visu_qqplot,
                            'Heatmap': img_visu_heatmap})
                 if args.dataset == 'Simulation':
-                    wandb.log({'Ground-truth PCA': img_visu_pca_ground,
-                               'Ground-truth QQplot': img_visu_qqplot_ground,
-                               'Ground-truth Heatmap': img_visu_heatmap_ground})
+                    wandb.log({'Verification PCA': img_visu_pca_ground,
+                               'Verification QQplot': img_visu_qqplot_ground,
+                               'Verification Heatmap': img_visu_heatmap_ground})
                 wandb.log({'Distance': dis,
                            'p-value': p_dis,
                            'cor_distance': cor_dis,
                            'moment_dis': moment_dis})
                 if args.dataset == 'Simulation':
-                    wandb.log({'Ground_Distance': dis_ground,
-                               'Ground_p-value': p_dis_ground,
-                               'Ground_cor_distance': cor_dis_ground,
-                               'Ground_moment_dis': moment_dis_ground,
+                    wandb.log({'Verification_Distance': dis_ground,
+                               'Verification_p-value': p_dis_ground,
+                               'Verification_cor_distance': cor_dis_ground,
+                               'Verification_moment_dis': moment_dis_ground,
                                })
 
                 #visu_pca = rearrange(visu_pca, 'h w c -> c h w')

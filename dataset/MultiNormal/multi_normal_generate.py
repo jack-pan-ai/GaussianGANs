@@ -18,14 +18,20 @@ def _simu_transform_Gaussian(latent_dim, size, transform, truncate, mode, channe
             mean = np.zeros(length_whole, dtype=float)
             cor = np.diag(np.ones(length_whole, dtype=float))
         else:
-            mean = np.random.uniform(1, 4, size=length_whole)
-            # let covariance matrix to be positive-semidefinite
-            cov = np.random.uniform(-1, 1, size=length_whole ** 2).reshape(length_whole, length_whole)
-            cov = np.dot(cov, cov.T)
-            cov = cov + cov.T
-            var = np.diag(1 / np.sqrt(np.diag(cov)))
-            cor = np.matmul(var, cov)
-            cor = np.matmul(cor, var)
+            if mode == 'train':
+                mean = np.random.uniform(1, 3, size=length_whole)
+                # let covariance matrix to be positive-semidefinite
+                cov = np.random.uniform(-1, 1, size=length_whole ** 2).reshape(length_whole, length_whole)
+                cov = np.dot(cov, cov.T)
+                cov = cov + cov.T
+                var = np.diag(1 / np.sqrt(np.diag(cov)))
+                cor = np.matmul(var, cov)
+                cor = np.matmul(cor, var)
+            else:
+                _data_path = data_path.replace('test', 'train')
+                with open(_data_path, 'rb') as f:
+                    data_GRF_train = pickle.load(f)
+                    mean, cor = data_GRF_train['mean'], data_GRF_train['cor']
         x = multivariate_normal(mean=mean, cov=cor, size=size)
 
         if transform:

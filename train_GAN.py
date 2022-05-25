@@ -132,7 +132,7 @@ def main_worker(gpu, ngpus_per_node, args):
                                        channels = args.simu_channels,  simu_dim=args.simu_dim,
                                        transform=args.transform, truncate=args.truncate)
         train_loader = data.DataLoader(train_set, batch_size=args.batch_size, num_workers=args.num_workers, shuffle=True)
-        test_set = MultiNormaldataset(latent_dim=args.noise_dim, size=10000, mode='test',
+        test_set = MultiNormaldataset(latent_dim=args.noise_dim, size=1000, mode='test',
                                       channels = args.simu_channels, transform=args.transform,
                                       truncate=args.truncate, simu_dim=args.simu_dim)
         #test_loader = data.DataLoader(test_set, batch_size=args.batch_size, num_workers=args.num_workers, shuffle=True)
@@ -318,6 +318,7 @@ def main_worker(gpu, ngpus_per_node, args):
                     sample_imgs = gen_net(fixed_z).detach()
                 save_samples(args, fixed_z[0].reshape(1, -1), epoch + 1, gen_net, writer_dict)
 
+                # Ground Truth in Simulation
                 if args.dataset == 'Simulation':
                     # inverse transformation
                     # [batch_size, channels, seq_length]
