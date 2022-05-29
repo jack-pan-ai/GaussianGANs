@@ -128,11 +128,11 @@ def main_worker(gpu, ngpus_per_node, args):
                                        class_name=args.class_name)
         #test_loader = data.DataLoader(test_set, batch_size=args.batch_size, num_workers=args.num_workers, shuffle=True)
     elif args.dataset == 'Simulation':
-        train_set = MultiNormaldataset(latent_dim=args.noise_dim, size=100000,  mode='train',
+        train_set = MultiNormaldataset(latent_dim=args.noise_dim, size=20000,  mode='train',
                                        channels = args.simu_channels,  simu_dim=args.simu_dim,
-                                       transform=args.transform, truncate=args.truncate)
+                                       transform=args.transform, truncate=args.truncate, appendix='new')
         train_loader = data.DataLoader(train_set, batch_size=args.batch_size, num_workers=args.num_workers, shuffle=True)
-        test_set = MultiNormaldataset(latent_dim=args.noise_dim, size=1000, mode='test',
+        test_set = MultiNormaldataset(latent_dim=args.noise_dim, size=args.eval_num, mode='test',
                                       channels = args.simu_channels, transform=args.transform,
                                       truncate=args.truncate, simu_dim=args.simu_dim)
         #test_loader = data.DataLoader(test_set, batch_size=args.batch_size, num_workers=args.num_workers, shuffle=True)
@@ -289,7 +289,7 @@ def main_worker(gpu, ngpus_per_node, args):
 
     # wandb ai monitoring
     # project_name = 'loss: ' + args.loss + ', n_gen: ' + str(args.n_gen) + ', n_dis: '+ str(args.n_dis)
-    wandb.init(project=args.dataset + str('GANs-v3'), entity="qilong77", name = args.exp_name +
+    wandb.init(project=args.dataset + str('GANs-v2'), entity="qilong77", name = args.exp_name +
                                                                                       'Dim: ' +
                                                                                       str(args.simu_dim) +
                                                                                       'Chan: ' +
@@ -316,18 +316,18 @@ def main_worker(gpu, ngpus_per_node, args):
                 with torch.no_grad():
                     # sample_imgs is on GPU device
                     sample_imgs = gen_net(fixed_z).detach()
-                save_samples(args, fixed_z[0].reshape(1, -1), epoch + 1, gen_net, writer_dict)
+                # save_samples(args, fixed_z[0].reshape(1, -1), epoch + 1, gen_net, writer_dict)
 
                 # Ground Truth in Simulation
                 if args.dataset == 'Simulation':
                     # inverse transformation
                     # [batch_size, channels, seq_length]
-                    ori_imgs = torch.log(sample_imgs.to('cpu').numpy() - 1)
+                    ori_imgs = torch.log(sample_imgs -1).to('cpu').numpy()
                     # [batch_size, channels, seq_length] -> [batch_size, channels * seq_length]
                     ori_imgs = rearrange(ori_imgs, 'b c l -> b (c l)')
 
                     mean_est = np.mean(ori_imgs, axis=0)
-                    mean_dis = np.sqrt(np.sum(mean_est - train_set.mean)**2)
+                    mean_dis = np.sqrt(np.sum((mean_est - train_set.mean)**2)) / ori_imgs.shape[1]
                     wandb.log({
                         'Mean distance (L2)': mean_dis
                     })
@@ -354,11 +354,10 @@ def main_worker(gpu, ngpus_per_node, args):
                 # Ground truth data
                 name_ground_truth = args.exp_name + str('ground')
                 visualization(ori_data=train_set[:args.eval_num],
-                              generated_data=test_set[:(len(test_set) - 1)],
-                              analysis='pca', save_name=name_ground_truth,
-                              epoch=epoch, args=args)
+                              generated_data=test_set[:args.eval_num],
+                              analysis='pca', save_name=name_ground_truth, epoch=epoch, args=args)
                 with torch.no_grad():
-                    sample_trans_imgs_ground = gen_inv_net(torch.from_numpy(test_set[:(len(test_set) - 1)]).type(torch.cuda.FloatTensor).cuda(args.gpu, non_blocking=True)).detach().to('cpu')
+                    sample_trans_imgs_ground = gen_inv_net(torch.from_numpy(test_set[:args.eval_num]).type(torch.cuda.FloatTensor).cuda(args.gpu, non_blocking=True)).detach().to('cpu')
                 qqplot(sample_trans_imgs_ground.squeeze(1), epoch=epoch, args=args,
                        save_name=name_ground_truth)
                 heatmap_cor(sample_trans_imgs_ground.squeeze(1), epoch=epoch, args=args,

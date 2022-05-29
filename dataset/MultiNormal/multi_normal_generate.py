@@ -10,7 +10,7 @@ def _simu_transform_Gaussian(latent_dim, size, transform, truncate, mode, channe
     data_path = './MultiNormalDataset/' + mode + \
                 '/data' + ('_transform' if transform else '') +  \
                 ('_truncate' if truncate else '') + ('_Dim' + str(latent_dim)) + \
-                ('_Chan' + str(channels)) + '.pkl'
+                ('_Chan' + str(channels)) +'.pkl'
 
     if not os.path.exists(data_path):
         length_whole = latent_dim * channels
@@ -55,6 +55,9 @@ def _simu_transform_Gaussian(latent_dim, size, transform, truncate, mode, channe
         with open(data_path, 'rb') as f:
             data_GRF = pickle.load(f)
         x, mean, cor = data_GRF['x'], data_GRF['mean'], data_GRF['cor']
+        if x.shape[0] > size:
+            no_shuffle = np.random.randint(0, x.shape[0], size)
+            x = x[no_shuffle]
         print('Dataset exists: ' + data_path)
         print(mode + ' Shape: ', x.shape)
         return x, mean, cor
@@ -62,7 +65,7 @@ def _simu_transform_Gaussian(latent_dim, size, transform, truncate, mode, channe
 
 
 class MultiNormaldataset(Dataset):
-    def __init__(self, latent_dim, size, mode, channels=None, simu_dim=None, transform = False, truncate = False):
+    def __init__(self, latent_dim, size, mode, channels=None, simu_dim=None, transform=False, truncate=False, appendix=None):
         assert mode == 'train' or mode == 'test', 'Please input the right mode: train or test.'
         if not os.path.exists('./MultiNormalDataset/' + mode):
             os.makedirs('MultiNormalDataset/' + mode)

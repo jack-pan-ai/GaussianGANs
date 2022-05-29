@@ -9,8 +9,8 @@ os.system(f"CUDA_VISIBLE_DEVICES=0,1,2,3,4,5,6,7 python ../train_inverseGAN.py \
 --world-size 1 \
 --dataset Simulation \
 --transform True \
---simu_dim 128 \
---simu_channels 1 \
+--simu_dim 64 \
+--simu_channels 2 \
 --noise_dim 16 \
 --gen_model my_gen \
 --dis_model my_dis \

@@ -274,7 +274,7 @@ def main_worker(gpu, ngpus_per_node, args):
 
     # wandb ai monitoring
     # project_name = 'loss: ' + args.loss + ', n_gen: ' + str(args.n_gen) + ', n_dis: ' + str(args.n_dis)
-    wandb.init(project=args.dataset + str('GaussianGANs'), entity="qilong77", name=args.exp_name +
+    wandb.init(project=args.dataset + str('GaussianGANs-v2'), entity="qilong77", name=args.exp_name +
                                                                                       'Dim: ' +
                                                                                       str(args.simu_dim) +
                                                                                       'Chan: ' +
@@ -293,7 +293,8 @@ def main_worker(gpu, ngpus_per_node, args):
               train_loader, epoch, writer_dict, img_set, lr_schedulers)
 
         # save the generated time series after using PCA and t-SNE
-
+        gen_net.eval()
+        dis_net.eval()
         if args.rank == 0 or args.show:
             if (epoch) % args.eval_epochs == 0:
                 # backup_param = copy_params(gen_net)
@@ -317,11 +318,14 @@ def main_worker(gpu, ngpus_per_node, args):
                     # verification
                     name_ground_truth = args.exp_name + str('ground')
                     # visuliztion: pca or t-sne plot or heatmap or qqplot
-                    visualization(ori_data=train_set[:args.eval_num], generated_data=gen_noise_ver[:args.eval_num],
+                    visualization(ori_data=train_set[:args.eval_num],
+                                  generated_data=gen_noise_ver[:args.eval_num],
                                   analysis='pca',
                                   save_name=name_ground_truth, epoch=epoch, args=args)
-                    qqplot(gen_noise_ver.squeeze(1), epoch=epoch, args=args, save_name=name_ground_truth)
-                    heatmap_cor(gen_noise_ver.squeeze(1), epoch=epoch, args=args, save_name=name_ground_truth)
+                    qqplot(gen_noise_ver[:args.eval_num].squeeze(1),
+                           epoch=epoch, args=args, save_name=name_ground_truth)
+                    heatmap_cor(gen_noise_ver[:args.eval_num].squeeze(1),
+                                epoch=epoch, args=args, save_name=name_ground_truth)
                     dis_ground, p_dis_ground, cor_dis_ground, moment_dis_ground = diff_cor(gen_noise_ver.squeeze(1))
 
                 # correlation matrix distance
@@ -333,7 +337,7 @@ def main_worker(gpu, ngpus_per_node, args):
                     if dis < dis_best:
                         dis_best = dis
                         is_best_dis = True
-                    if p_dis < p_dis_best:
+                    if p_dis <= p_dis_best:
                         p_dis_best = p_dis
                         is_best_p = True
                     if cor_dis < cor_dis_best:

@@ -214,6 +214,7 @@ def save_checkpoint(states, output_dir,
 def load_checkpoint(net, checkpoint_PATH, optimizer=None):
     cwd = os.getcwd()
     CKPT_PATH = os.path.join(cwd, checkpoint_PATH)
+    # print('Loaded Path: ', CKPT_PATH)
     if CKPT_PATH is not None:
         print('loading checkpoint!')
         CKPT = torch.load(CKPT_PATH)
