@@ -273,12 +273,13 @@ def main_worker(gpu, ngpus_per_node, args):
     print('------------------------------------------------------------')
 
     # wandb ai monitoring
-    # project_name = 'loss: ' + args.loss + ', n_gen: ' + str(args.n_gen) + ', n_dis: ' + str(args.n_dis)
-    wandb.init(project=args.dataset + str('GaussianGANs-v2'), entity="qilong77", name=args.exp_name +
-                                                                                      'Dim: ' +
-                                                                                      str(args.simu_dim) +
-                                                                                      'Chan: ' +
-                                                                                      str(args.simu_channels))
+    project_name = 'n_gen: ' + str(args.n_gen) + ', n_dis: ' + str(args.n_dis)
+    # wandb.init(project=args.dataset + str('GaussianGANs-v4'), entity="qilong77", name=args.exp_name +
+    #                                                                                   'Dim: ' +
+    #                                                                                   str(args.simu_dim) +
+    #                                                                                   'Chan: ' +
+    #                                                                                   str(args.simu_channels))
+    wandb.init(project=args.dataset + str('GaussianGANs-v4'), entity="qilong77", name=project_name)
     wandb.config = {
         "epochs": int(args.epochs) - int(start_epoch),
         "batch_size": args.batch_size

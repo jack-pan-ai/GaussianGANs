@@ -10,7 +10,7 @@ os.system(f"CUDA_VISIBLE_DEVICES=0,1,2,3,4,5,6,7 python ../train_inverseGAN.py \
 --dataset Simulation \
 --transform True \
 --simu_dim 64 \
---simu_channels 2 \
+--simu_channels 4 \
 --noise_dim 16 \
 --gen_model my_gen \
 --dis_model my_dis \
@@ -20,7 +20,7 @@ os.system(f"CUDA_VISIBLE_DEVICES=0,1,2,3,4,5,6,7 python ../train_inverseGAN.py \
 --d_lr 0.0003 \
 --loss lsgan \
 --n_dis 1 \
---n_gen 3 \
+--n_gen 1 \
 --patch_size 15 \
 --phi 1 \
 --batch_size 128 \

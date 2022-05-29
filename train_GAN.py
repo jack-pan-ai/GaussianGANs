@@ -289,7 +289,7 @@ def main_worker(gpu, ngpus_per_node, args):
 
     # wandb ai monitoring
     # project_name = 'loss: ' + args.loss + ', n_gen: ' + str(args.n_gen) + ', n_dis: '+ str(args.n_dis)
-    wandb.init(project=args.dataset + str('GANs-v2'), entity="qilong77", name = args.exp_name +
+    wandb.init(project=args.dataset + str('GANs-v4'), entity="qilong77", name = args.exp_name +
                                                                                       'Dim: ' +
                                                                                       str(args.simu_dim) +
                                                                                       'Chan: ' +
