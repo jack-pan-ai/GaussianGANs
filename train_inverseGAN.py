@@ -273,7 +273,7 @@ def main_worker(gpu, ngpus_per_node, args):
     print('------------------------------------------------------------')
 
     # wandb ai monitoring
-    project_name = 'n_gen: ' + str(args.n_gen) + ', n_dis: ' + str(args.n_dis)
+    project_name = 'n_gen: ' + str(args.n_gen) + ', n_dis: ' + str(args.n_dis) + ', ' + str(args.simu_channels)+ '*'+ str(args.simu_dim)
     # wandb.init(project=args.dataset + str('GaussianGANs-v4'), entity="qilong77", name=args.exp_name +
     #                                                                                   'Dim: ' +
     #                                                                                   str(args.simu_dim) +

@@ -19,7 +19,7 @@ def _simu_transform_Gaussian(latent_dim, size, transform, truncate, mode, channe
             cor = np.diag(np.ones(length_whole, dtype=float))
         else:
             if mode == 'train':
-                mean = np.random.uniform(1, 3, size=length_whole)
+                mean = np.random.uniform(5, 7, size=length_whole)
                 # let covariance matrix to be positive-semidefinite
                 cov = np.random.uniform(-1, 1, size=length_whole ** 2).reshape(length_whole, length_whole)
                 cov = np.dot(cov, cov.T)
@@ -36,7 +36,7 @@ def _simu_transform_Gaussian(latent_dim, size, transform, truncate, mode, channe
 
         if transform:
             # non-linear transformation
-            x = np.exp(x) + 1
+            x = np.log(x) + 1
         if truncate:
             # truncation (0, +inf)
             c = max(np.abs(x)) / 1.2
