@@ -170,29 +170,26 @@ class ClassificationHead(nn.Sequential):
         return out
 
 class PatchEmbedding_Linear(nn.Module):
-    # what are the proper parameters set here?
+
     def __init__(self, in_channels, patch_size, emb_size, seq_length):
         # self.patch_size = patch_size
         super().__init__()
         # change the conv2d parameters here
         self.projection = nn.Sequential(
-            # add a linear to make all length of data could be served as input for discriminator
-            nn.Linear(seq_length, seq_length * patch_size),
-            # [batch_size, channels, seq_len] -> [batch_size, channels, seq_len*patch_size]
+            # [batch_size, channels, (seq_len//patch_size, patch_size)] -> [batch_size, seq_len//patch_size, channels*patch_size]
             Rearrange('b c (w s2) -> b w (s2 c)', s2=patch_size),
-            # [batch_size, channels, seq_len*patch_size] -> [batch_size, seq_len, channels*patch_size]
+            # [batch_size, seq_len//patch_size, channels*patch_size] -> [batch_size, seq_len//patch_size, emb_size]
             nn.Linear(patch_size * in_channels, emb_size)
-            # [batch_size, seq_len, channels*patch_size] -> [batch_size, seq_len, emb_size]
         )
         self.cls_token = nn.Parameter(torch.randn(1, 1, emb_size))
-        self.positions = nn.Parameter(torch.randn(seq_length + 1, emb_size))
+        self.positions = nn.Parameter(torch.randn(seq_length//patch_size + 1, emb_size))
 
     def forward(self, x: Tensor) -> Tensor:
         b, _, _ = x.shape
-        x = self.projection(x) # [batch_size, channels, seq_len] -> [batch_size, patch_num, channels*patch_size]
+        x = self.projection(x) # [batch_size, channels, seq_len] -> [batch_size, seq_len//patch_size, emb_size]
         cls_tokens = repeat(self.cls_token, '() n e -> b n e', b=b)
         # prepend the cls token to the input
-        x = torch.cat([cls_tokens, x], dim=1) # [batch_size, patch_num, channels*patch_size] -> [batch_size, patch_num + 1, channels*patch_size]
+        x = torch.cat([cls_tokens, x], dim=1) # [batch_size, seq_len//patch_size, emb_size] -> [batch_size, seq_len//patch_size + 1, emb_size]
         # position
         x += self.positions
         return x
@@ -209,14 +206,14 @@ class inverseDiscriminator(nn.Sequential):
                  n_classes=1,
                  **kwargs):
         super(inverseDiscriminator, self).__init__(
-            # [batch_size, channels, seq_len] -> [batch_size, patch_num + 1, channels*patch_size]
+            # [batch_size, channels, seq_len] -> [batch_size, seq_len//patch_size + 1, emb_size]
             PatchEmbedding_Linear(in_channels=channels, patch_size=patch_size,
                                   emb_size=emb_size, seq_length=seq_len),
-            # [batch_size, patch_num + 1, channels*patch_size] -> [batch_size, patch_num + 1, channels*patch_size]
+            # [batch_size, seq_len//patch_size + 1, emb_size] -> [batch_size, seq_len//patch_size + 1, emb_size]
             Dis_TransformerEncoder(depth, emb_size=emb_size, num_heads = num_heads,
                                    drop_p=0.5, forward_drop_p=0.5,
                                    **kwargs),
-            # [batch_size, patch_num + 1, channels*patch_size] -> [batch_size, 1]
+            # [batch_size, seq_len//patch_size + 1, emb_size] -> [batch_size, 1]
             ClassificationHead(emb_size, n_classes)
         )
 
