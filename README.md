@@ -76,13 +76,9 @@ python RunningGAN_Train.py
  
  ## TO DO
  
- - [x] ~~Do the simulation on Gaussian Random Field (GRF) ~~
-
-       CANNOT achieve a good result.
+ - [x] ~~Do the simulation on Gaussian Random Field (GRF)~~. CANNOT achieve a good result.
        
- - [x] ~~Do the simulation on stationary Vector AR(1) model~~
-       
-       CANNOT achieve a good result.
+ - [x] ~~Do the simulation on stationary Vector AR(1) model~~. CANNOT achieve a good result.
        
  - [ ] Do the simulation on spatial temproral Gaussian process.
 
