@@ -24,7 +24,7 @@ class inverseGenerator(nn.Module):
         self.forward_drop_rate = forward_drop_rate
 
         self.l1 = nn.Linear(self.seq_len * self.embed_dim, self.latent_dim)
-        self.pos_embed = nn.Parameter(torch.randn(1, self.channels, self.seq_len))
+        self.pos_embed = nn.Parameter(torch.zeros(1, self.channels, self.seq_len))
         self.blocks = Gen_TransformerEncoder(
             depth=self.depth,
             num_heads = self.num_heads,

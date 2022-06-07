@@ -128,7 +128,7 @@ def main_worker(gpu, ngpus_per_node, args):
                                        class_name=args.class_name)
         #test_loader = data.DataLoader(test_set, batch_size=args.batch_size, num_workers=args.num_workers, shuffle=True)
     elif args.dataset == 'Simulation':
-        train_set = MultiNormaldataset(latent_dim=args.noise_dim, size=20000,  mode='train',
+        train_set = MultiNormaldataset(latent_dim=args.noise_dim, size=10000,  mode='train',
                                        channels = args.simu_channels,  simu_dim=args.simu_dim,
                                        transform=args.transform, truncate=args.truncate, appendix='new')
         train_loader = data.DataLoader(train_set, batch_size=args.batch_size, num_workers=args.num_workers, shuffle=True)
@@ -289,11 +289,10 @@ def main_worker(gpu, ngpus_per_node, args):
 
     # wandb ai monitoring
     # project_name = 'loss: ' + args.loss + ', n_gen: ' + str(args.n_gen) + ', n_dis: '+ str(args.n_dis)
-    wandb.init(project=args.dataset + str('GANs-v4'), entity="qilong77", name = args.exp_name +
-                                                                                      'Dim: ' +
-                                                                                      str(args.simu_dim) +
-                                                                                      'Chan: ' +
-                                                                                      str(args.simu_channels))
+    project_name = 'n_gen: ' + str(args.n_gen) + ', n_dis: ' + str(args.n_dis) + ', ' + \
+                   str(args.simu_channels) + '*' + str(args.simu_dim) + \
+                   (str('trans') if args.transform else '') + (str('trun') if args.truncate else '')
+    wandb.init(project=args.dataset + args.exp_name, entity="qilong77", name = project_name)
     wandb.config = {
         "epochs": int(args.epochs) - int(start_epoch),
         "batch_size": args.batch_size

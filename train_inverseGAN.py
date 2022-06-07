@@ -9,6 +9,7 @@ from utils.functions import inverse_train, save_samples, LinearLrDecay, load_par
 from utils.utils import set_log_dir, save_checkpoint, create_logger
 from utils.visualizationMetrics import visualization
 from dataset.MultiNormal.multi_normal_generate import MultiNormaldataset
+from dataset.ARV.arvSimulation import VARdataset
 from utils.statEstimate import *
 
 import torch
@@ -127,16 +128,30 @@ def main_worker(gpu, ngpus_per_node, args):
         img_set = unimib_load_dataset(incl_xyz_accel=True, incl_rms_accel=False, incl_val_group=False, is_normalize=True,
                                         one_hot_encode=False, data_mode='Train', single_class=True,
                                         class_name=args.class_name, augment_times=args.augment_times)
+        ver_set = unimib_load_dataset(incl_xyz_accel=True, incl_rms_accel=False, incl_val_group=False,
+                                      is_normalize=True,
+                                      one_hot_encode=False, data_mode='Test', single_class=True,
+                                      class_name=args.class_name, augment_times=args.augment_times)
     elif args.dataset =='Simulation':
         img_set = MultiNormaldataset(
-            latent_dim=args.noise_dim, size=100000,  # large enough to get a approximate sampling space
+            latent_dim=args.noise_dim, size=10000,  # large enough to get a approximate sampling space
             mode='train', channels=args.simu_channels,
             simu_dim=args.simu_dim,
             transform=args.transform, truncate=args.truncate
         )
+
         ver_set = MultiNormaldataset(latent_dim=args.noise_dim, size=args.eval_num, mode='test',
                                       channels=args.simu_channels, transform=args.transform,
                                       truncate=args.truncate, simu_dim=args.simu_dim)
+
+        # img_set = VARdataset(
+        #     latent_dim=args.simu_dim, size=10000,
+        #     mode='train', channels=args.simu_channels,
+        # )
+        # ver_set = VARdataset(
+        #     latent_dim=args.simu_dim, size=args.eval_num,
+        #     mode='test', channels=args.simu_channels,
+        # )
     else:
         print('Please input the correct dataset name: UniMiB or Simulation.')
         raise TypeError
@@ -281,7 +296,7 @@ def main_worker(gpu, ngpus_per_node, args):
     #                                                                                   str(args.simu_dim) +
     #                                                                                   'Chan: ' +
     #                                                                                   str(args.simu_channels))
-    wandb.init(project=args.dataset + str('GaussianGANs-v4-d2'), entity="qilong77", name=project_name)
+    wandb.init(project=args.dataset + args.exp_name, entity="qilong77", name=project_name)
     wandb.config = {
         "epochs": int(args.epochs) - int(start_epoch),
         "batch_size": args.batch_size

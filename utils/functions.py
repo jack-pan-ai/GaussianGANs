@@ -136,10 +136,10 @@ def train(args, gen_net: nn.Module, dis_net: nn.Module, gen_optimizer, dis_optim
                         real_label = torch.full((fake_validity.shape[0],), 1., dtype=torch.float, device=real_imgs.get_device())
                         g_loss = nn.MSELoss()(fake_validity.view(-1), real_label)
                     elif args.loss == 'wgangp-mode':
-                        fake_image1, fake_image2 = gen_imgs[:args.batch_size//2], gen_imgs[args.batch_size//2:]
-                        z_random1, z_random2 = gen_z[:args.batch_size//2], gen_z[args.batch_size//2:]
-                        lz = torch.mean(torch.abs(fake_image2 - fake_image1)) / torch.mean(
-                        torch.abs(z_random2 - z_random1))
+                        cur_batch_size = imgs.shape[0]
+                        fake_image1, fake_image2 = gen_imgs[:cur_batch_size//2], gen_imgs[cur_batch_size//2:]
+                        z_random1, z_random2 = gen_z[:cur_batch_size//2], gen_z[cur_batch_size//2:]
+                        lz = torch.mean(torch.abs(fake_image2 - fake_image1)) / torch.mean(torch.abs(z_random2 - z_random1))
                         eps = 1 * 1e-5
                         loss_lz = 1 / (lz + eps)
 
@@ -296,10 +296,10 @@ def inverse_train(args, gen_net: nn.Module, dis_net: nn.Module, gen_optimizer, d
                                             device=real_z.get_device())
                     g_loss = nn.MSELoss()(fake_validity.view(-1), real_label)
                 elif args.loss == 'wgangp-mode':
-                    fake_image1, fake_image2 = imgs_n[:args.batch_size // 2], imgs_n[args.batch_size // 2:]
-                    z_random1, z_random2 = imgs_n[:args.batch_size // 2], imgs_n[args.batch_size // 2:]
-                    lz = torch.mean(torch.abs(fake_image2 - fake_image1)) / torch.mean(
-                        torch.abs(z_random2 - z_random1))
+                    cur_batch_length = imgs.shape[0]
+                    fake_image1, fake_image2 = imgs_n[:cur_batch_length // 2], imgs_n[cur_batch_length // 2:]
+                    z_random1, z_random2 = imgs_n[:cur_batch_length // 2], imgs_n[cur_batch_length // 2:]
+                    lz = torch.mean(torch.abs(fake_image2 - fake_image1)) / torch.mean(torch.abs(z_random2 - z_random1))
                     eps = 1 * 1e-5
                     loss_lz = 1 / (lz + eps)
 

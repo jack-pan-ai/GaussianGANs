@@ -19,7 +19,7 @@ def _simu_transform_Gaussian(latent_dim, size, transform, truncate, mode, channe
             cor = np.diag(np.ones(length_whole, dtype=float))
         else:
             if mode == 'train':
-                mean = np.random.uniform(-0.5, 0.5, size=length_whole)
+                mean = np.random.uniform(-2, 2, size=length_whole)
                 # let covariance matrix to be positive-semidefinite
                 cov = np.random.uniform(-1, 1, size=length_whole ** 2).reshape(length_whole, length_whole)
                 cov = np.dot(cov, cov.T)
@@ -36,7 +36,7 @@ def _simu_transform_Gaussian(latent_dim, size, transform, truncate, mode, channe
 
         if transform:
             # non-linear transformation
-            x = np.sin(x)
+            x = np.exp(x) + 1
         if truncate:
             # truncation (0, +inf)
             c = np.max(np.abs(x)) / 1.2
@@ -65,7 +65,7 @@ def _simu_transform_Gaussian(latent_dim, size, transform, truncate, mode, channe
 
 
 class MultiNormaldataset(Dataset):
-    def __init__(self, latent_dim, size, mode, channels=None, simu_dim=None, transform=False, truncate=False, appendix=None):
+    def __init__(self, latent_dim, size, mode, channels=None, simu_dim=None, transform=False, truncate=False):
         assert mode == 'train' or mode == 'test', 'Please input the right mode: train or test.'
         if not os.path.exists('./MultiNormalDataset/' + mode):
             os.makedirs('MultiNormalDataset/' + mode)

@@ -4,7 +4,7 @@ import os
 import argparse
 
 os.system(f"CUDA_VISIBLE_DEVICES=0,1,2,3,4,5,6,7 python ../train_inverseGAN.py \
---gpu 1 \
+--gpu 0 \
 --dist-url 'tcp://localhost:4321' \
 --world-size 1 \
 --dataset UniMiB \
@@ -23,4 +23,4 @@ os.system(f"CUDA_VISIBLE_DEVICES=0,1,2,3,4,5,6,7 python ../train_inverseGAN.py \
 --epochs 3000 \
 --print_freq 50 \
 --class_name Running \
---exp_name RunningInverse-dis-v3")
+--exp_name Running-Gau")
