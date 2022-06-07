@@ -76,4 +76,17 @@ python RunningGAN_Train.py
  
  ## TO DO
  
- - [ ] Do the simulation verifcation on Gaussian Random Field (GRF) 
+ - [x] ~~Do the simulation on Gaussian Random Field (GRF) ~~
+
+       CANNOT achieve a good result.
+       
+ - [x] ~~Do the simulation on stationary Vector AR(1) model~~
+       
+       CANNOT achieve a good result.
+       
+ - [ ] Do the simulation on spatial temproral Gaussian process.
+
+ - [ ] Implement the Gaussian GANs on other GANs' architectures under time series tasks.
+
+### Some possible explanation
+The transformer-based GANs cannot achieve a good result on simulated dataset, which may be caused by the poor generalization of transformer-based GANs.
