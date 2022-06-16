@@ -49,7 +49,7 @@ def heatmap_cor(x, epoch, args = None, save_name=None):
     '''
     used to plot the correlation matrix
     :param x: input batch_size model [batch_size, noise_dimension]
-    :return: figrue
+    :return: figure
     '''
     if type(x) is torch.Tensor:
         if x.get_device:
@@ -70,8 +70,12 @@ def heatmap_cor(x, epoch, args = None, save_name=None):
     if args is not None:
         plt.savefig(os.path.join(args.path_helper['log_path_img_heatmap'],f'{save_name}_epoch_{epoch+1}.png'), format="png")
 
-
 def qqplot(x, epoch, args = None, save_name=None):
+    '''
+    Used to plot the QQ plot for x and chi-square distribution
+    :param x: tested data
+    :param epoch: index, a monitor for training process
+    '''
     if type(x) is torch.Tensor:
         if x.get_device:
             x = x.cpu()
@@ -91,15 +95,4 @@ def qqplot(x, epoch, args = None, save_name=None):
     if args is not None:
         plt.savefig(os.path.join(args.path_helper['log_path_img_qqplot'],f'{save_name}_epoch_{epoch+1}.png'), format="png")
 
-
-if __name__=='__main__':
-    with open('../inverse_jump.csv', 'r') as f:
-        x = np.loadtxt(f, delimiter=',')
-        #x = np.sum(x**2, axis=1)
-    with open('../inv.csv') as f:
-        tr = np.loadtxt(f, delimiter=',')
-        #tr = np.sum(tr**2, axis=1)
-    print(diff_cor(tr))
-    print(diff_cor(x))
-    heatmap_cor(x)
 

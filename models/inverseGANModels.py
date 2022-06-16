@@ -48,6 +48,27 @@ class inverseGenerator(nn.Module):
 
         return z
 
+class inverseDiscriminator(nn.Sequential):
+    def __init__(self,
+                 seq_len,
+                 channels,
+                 depth,
+                 patch_size=8,
+                 num_heads=5, # num_head * integer = emb_size
+                 emb_size=50,
+                 n_classes=1,
+                 **kwargs):
+        super(inverseDiscriminator, self).__init__(
+            # [batch_size, channels, seq_len] -> [batch_size, seq_len//patch_size + 1, emb_size]
+            PatchEmbedding_Linear(in_channels=channels, patch_size=patch_size,
+                                  emb_size=emb_size, seq_length=seq_len),
+            # [batch_size, seq_len//patch_size + 1, emb_size] -> [batch_size, seq_len//patch_size + 1, emb_size]
+            Dis_TransformerEncoder(depth, emb_size=emb_size, num_heads = num_heads,
+                                   drop_p=0.5, forward_drop_p=0.5,
+                                   **kwargs),
+            # [batch_size, seq_len//patch_size + 1, emb_size] -> [batch_size, 1]
+            ClassificationHead(emb_size, n_classes)
+        )
 
 class Gen_TransformerEncoderBlock(nn.Sequential):
     def __init__(self,
@@ -71,11 +92,9 @@ class Gen_TransformerEncoderBlock(nn.Sequential):
             )
             ))
 
-
 class Gen_TransformerEncoder(nn.Sequential):
     def __init__(self, depth=8, **kwargs):
         super().__init__(*[Gen_TransformerEncoderBlock(**kwargs) for _ in range(depth)])
-
 
 class MultiHeadAttention(nn.Module):
     def __init__(self, emb_size, num_heads, dropout):
@@ -105,7 +124,6 @@ class MultiHeadAttention(nn.Module):
         out = self.projection(out)
         return out
 
-
 class ResidualAdd(nn.Module):
     def __init__(self, fn):
         super().__init__()
@@ -117,7 +135,6 @@ class ResidualAdd(nn.Module):
         x += res
         return x
 
-
 class FeedForwardBlock(nn.Sequential):
     def __init__(self, emb_size, expansion, drop_p):
         super().__init__(
@@ -126,7 +143,6 @@ class FeedForwardBlock(nn.Sequential):
             nn.Dropout(drop_p),
             nn.Linear(expansion * emb_size, emb_size),
         )
-
 
 class Dis_TransformerEncoderBlock(nn.Sequential):
     def __init__(self,
@@ -150,11 +166,9 @@ class Dis_TransformerEncoderBlock(nn.Sequential):
             )
             ))
 
-
 class Dis_TransformerEncoder(nn.Sequential):
     def __init__(self, depth, **kwargs):
         super().__init__(*[Dis_TransformerEncoderBlock(**kwargs) for _ in range(depth)])
-
 
 class ClassificationHead(nn.Sequential):
     def __init__(self, emb_size, n_classes):
@@ -195,33 +209,4 @@ class PatchEmbedding_Linear(nn.Module):
         return x
 
 
-class inverseDiscriminator(nn.Sequential):
-    def __init__(self,
-                 seq_len,
-                 channels,
-                 depth,
-                 patch_size=8,
-                 num_heads=5, # num_head * integer = emb_size
-                 emb_size=50,
-                 n_classes=1,
-                 **kwargs):
-        super(inverseDiscriminator, self).__init__(
-            # [batch_size, channels, seq_len] -> [batch_size, seq_len//patch_size + 1, emb_size]
-            PatchEmbedding_Linear(in_channels=channels, patch_size=patch_size,
-                                  emb_size=emb_size, seq_length=seq_len),
-            # [batch_size, seq_len//patch_size + 1, emb_size] -> [batch_size, seq_len//patch_size + 1, emb_size]
-            Dis_TransformerEncoder(depth, emb_size=emb_size, num_heads = num_heads,
-                                   drop_p=0.5, forward_drop_p=0.5,
-                                   **kwargs),
-            # [batch_size, seq_len//patch_size + 1, emb_size] -> [batch_size, 1]
-            ClassificationHead(emb_size, n_classes)
-        )
-
-if __name__ == "__main__":
-    gen = inverseGenerator(seq_len = 150,  channels=3, num_heads=5, latent_dim=64, depth=4, patch_size=15)
-    out_gen = gen(torch.randn(128, 3, 150))
-    print(out_gen.shape)
-    dis = inverseDiscriminator(seq_len = 64, channels =1, depth=4, patch_size=8)
-    out_gen = dis(torch.randn(128, 1 ,64))
-    print(out_gen.shape)
 

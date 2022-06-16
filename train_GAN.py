@@ -6,7 +6,7 @@ from config import cfg
 from dataset.UniMiB.dataLoader import *
 from dataset.MultiNormal.multi_normal_generate import *
 from models.GANModels import *
-from utils.functions import train, save_samples, LinearLrDecay, load_params, copy_params
+from utils.functions import train, LinearLrDecay
 from utils.utils import set_log_dir, save_checkpoint, create_logger
 from utils.visualizationMetrics import visualization
 from utils.statEstimate import *
@@ -14,15 +14,12 @@ from utils.utils import load_checkpoint
 from models.inverseGANModels import inverseGenerator
 
 import torch
-import torch.multiprocessing as mp
-import torch.distributed as dist
 import torch.utils.data.distributed
 from torch.utils import data
 import os
 import numpy as np
 import torch.nn as nn
 from torch.utils.tensorboard import SummaryWriter
-from copy import deepcopy
 import random
 import matplotlib.pyplot as plt
 from torchinfo import summary
@@ -40,9 +37,9 @@ import wandb
 
 def main():
     args = cfg.parse_args()
-    
+
+    # set seed for experiment, to reproduce our results
     if args.seed is not None:
-        # reproduce the results
         torch.manual_seed(args.seed)
         torch.cuda.manual_seed_all(args.seed)
         np.random.seed(args.seed)
@@ -50,42 +47,16 @@ def main():
         torch.backends.cudnn.benchmark = False # the accelerator for CNN computation
         torch.backends.cudnn.deterministic = True
 
+    # gpu setting
     if args.gpu is not None:
-        warnings.warn('You have chosen a specific GPU. This will completely disable data parallelism.')
-
-    if args.dist_url == "env://" and args.world_size == -1:
-         args.world_size = int(os.environ["WORLD_SIZE"])#
-
-    args.distributed = args.world_size > 1 or args.multiprocessing_distributed
-
-    ngpus_per_node = torch.cuda.device_count()
-    if args.multiprocessing_distributed:
-        # Since we have ngpus_per_node processes per node, the total world_size
-        # needs to be adjusted accordingly
-        args.world_size = ngpus_per_node * args.world_size
-        # Use torch.multiprocessing.spawn to launch distributed processes: the
-        # main_worker process function
-        mp.spawn(main_worker, nprocs=ngpus_per_node, args=(ngpus_per_node, args))
-    else:
-        # Simply call main_worker function
-        main_worker(args.gpu, ngpus_per_node, args)
+        main_worker(args.gpu, args)
         
-def main_worker(gpu, ngpus_per_node, args):
+def main_worker(gpu, args):
     args.gpu = gpu
-    
     if args.gpu is not None:
         print("Use GPU: {} for training".format(args.gpu))
 
-    if args.distributed:
-        if args.dist_url == "env://" and args.rank == -1:
-            args.rank = int(os.environ["RANK"])
-        if args.multiprocessing_distributed:
-            # For multiprocessing distributed training, rank needs to be the
-            # global rank among all the processes
-            args.rank = args.rank * ngpus_per_node + gpu
-        dist.init_process_group(backend=args.dist_backend, init_method=args.dist_url,
-                                world_size=args.world_size, rank=args.rank)
-    # weight init
+    # weight initialization
     def weights_init(m):
         classname = m.__class__.__name__
         if classname.find('Conv2d') != -1:
@@ -97,26 +68,13 @@ def main_worker(gpu, ngpus_per_node, args):
                 nn.init.xavier_uniform(m.weight.data, 1.)
             else:
                 raise NotImplementedError('{} unknown inital type'.format(args.init_type))
-#         elif classname.find('Linear') != -1:
-#             if args.init_type == 'normal':
-#                 nn.init.normal_(m.weight.data, 0.0, 0.02)
-#             elif args.init_type == 'orth':
-#                 nn.init.orthogonal_(m.weight.data)
-#             elif args.init_type == 'xavier_uniform':
-#                 nn.init.xavier_uniform(m.weight.data, 1.)
-#             else:
-#                 raise NotImplementedError('{} unknown inital type'.format(args.init_type))
         elif classname.find('BatchNorm2d') != -1:
             nn.init.normal_(m.weight.data, 1.0, 0.02)
             nn.init.constant_(m.bias.data, 0.0)
 
-    # dataset loading
-    print('------------------------------------------------------------')
-    print('Data Loadering ~ Wait ~')
-    print('------------------------------------------------------------')
-
-    # train_set = VTSDataset(set_type = 'train')
-    # test_set = TSDataset(set_type = 'test')
+    #-------------------------------------------------------------------#
+    #------------------------   dataset loading ------------------------#
+    # -------------------------------------------------------------------#
     # [batch_size, channles, seq-len]
     if args.dataset == 'UniMiB':
         train_set = unimib_load_dataset(incl_xyz_accel=True, incl_rms_accel=False, incl_val_group=False, is_normalize=True,
@@ -126,99 +84,56 @@ def main_worker(gpu, ngpus_per_node, args):
         test_set = unimib_load_dataset(incl_xyz_accel=True, incl_rms_accel=False, incl_val_group=False, is_normalize=True,
                                        one_hot_encode=False, data_mode='Test', single_class=True,
                                        class_name=args.class_name)
-        #test_loader = data.DataLoader(test_set, batch_size=args.batch_size, num_workers=args.num_workers, shuffle=True)
+        # test_loader = data.DataLoader(test_set, batch_size=args.batch_size, num_workers=args.num_workers, shuffle=True)
     elif args.dataset == 'Simulation':
-        train_set = MultiNormaldataset(latent_dim=args.noise_dim, size=10000,  mode='train',
+        train_set = MultiNormaldataset(latent_dim=args.latent_dim, size=10000,  mode='train',
                                        channels = args.simu_channels,  simu_dim=args.simu_dim,
                                        transform=args.transform, truncate=args.truncate, appendix='new')
         train_loader = data.DataLoader(train_set, batch_size=args.batch_size, num_workers=args.num_workers, shuffle=True)
-        test_set = MultiNormaldataset(latent_dim=args.noise_dim, size=args.eval_num, mode='test',
+        test_set = MultiNormaldataset(latent_dim=args.latent_dim, size=args.eval_num, mode='test',
                                       channels = args.simu_channels, transform=args.transform,
                                       truncate=args.truncate, simu_dim=args.simu_dim)
-        #test_loader = data.DataLoader(test_set, batch_size=args.batch_size, num_workers=args.num_workers, shuffle=True)
-
+        # test_loader = data.DataLoader(test_set, batch_size=args.batch_size, num_workers=args.num_workers, shuffle=True)
     else:
         print('Please input the correct dataset name: UniMiB or Simulation.')
         raise TypeError
-
     print('------------------------------------------------------------')
     print('How many iterations in a training epoch: ', len(train_loader))
     print('------------------------------------------------------------')
     assert len(train_set) >= args.eval_num, 'The number of evaluation should be less than test_set'
 
+    #-------------------------------------------------------------------#
+    #------------------------   Model & optimizer init ------------------#
+    # -------------------------------------------------------------------#
     channels, seq_len = train_set[1].shape
-    # import network
     gen_net = Generator(seq_len=seq_len, channels=channels,
-                        num_heads= args.heads, latent_dim=args.noise_dim,
+                        num_heads= args.heads, latent_dim=args.latent_dim,
                         depth=args.g_depth, patch_size=args.patch_size)
     dis_net = Discriminator(seq_len=seq_len, channels=channels,
                             num_heads=args.heads, depth=args.d_depth,
                             patch_size=args.patch_size)
-    # import inverse network
+    # Gaussian GANs loading
     if args.checkpoint_best_PATH is not None:
         if args.gpu is not None:
             gen_inv_net = inverseGenerator(seq_len=seq_len, channels=channels,
-                                num_heads= args.heads, latent_dim=args.noise_dim,
+                                num_heads= args.heads, latent_dim=args.latent_dim,
                                 depth=args.g_depth, patch_size=args.patch_size).cuda(args.gpu)
         else:
             gen_inv_net = inverseGenerator(seq_len=seq_len, channels=channels,
-                                           num_heads=args.heads, latent_dim=args.noise_dim,
+                                           num_heads=args.heads, latent_dim=args.latent_dim,
                                            depth=args.g_depth, patch_size=args.patch_size).cuda()
         checkpoint_best_PATH = args.checkpoint_best_PATH
         load_checkpoint(gen_inv_net, checkpoint_best_PATH)
         gen_inv_net.eval()
-
-    #print(dis_net)
-    print('------------------------------------------------------------')
-    print('Copy Gen/Dis networks to gpu')
-    print('------------------------------------------------------------')
-    if not torch.cuda.is_available():
-        print('using CPU, this will be slow')
-    elif args.distributed:
-        # For multiprocessing distributed, DistributedDataParallel constructor
-        # should always set the single device scope, otherwise,
-        # DistributedDataParallel will use all available devices.
-        if args.gpu is not None:
-            torch.cuda.set_device(args.gpu)
-#             gen_net = eval('models_search.'+args.gen_model+'.Generator')(args=args)
-#             dis_net = eval('models_search.'+args.dis_model+'.Discriminator')(args=args)
-
-            gen_net.apply(weights_init)
-            dis_net.apply(weights_init)
-            gen_net.cuda(args.gpu)
-            dis_net.cuda(args.gpu)
-            # When using a single GPU per process and per
-            # DistributedDataParallel, we need to divide the batch size
-            # ourselves based on the total number of GPUs we have
-            args.dis_batch_size = int(args.dis_batch_size / ngpus_per_node)
-            args.gen_batch_size = int(args.gen_batch_size / ngpus_per_node)
-            args.batch_size = args.dis_batch_size
-            
-            args.num_workers = int((args.num_workers + ngpus_per_node - 1) / ngpus_per_node)
-            gen_net = torch.nn.parallel.DistributedDataParallel(gen_net, device_ids=[args.gpu], find_unused_parameters=True)
-            dis_net = torch.nn.parallel.DistributedDataParallel(dis_net, device_ids=[args.gpu], find_unused_parameters=True)
-        else:
-            gen_net.cuda()
-            dis_net.cuda()
-            # DistributedDataParallel will divide and allocate batch_size to all
-            # available GPUs if device_ids are not set
-            gen_net = torch.nn.parallel.DistributedDataParallel(gen_net)
-            dis_net = torch.nn.parallel.DistributedDataParallel(dis_net)
-    elif args.gpu is not None:
-        torch.cuda.set_device(args.gpu)
-        gen_net.cuda(args.gpu)
-        dis_net.cuda(args.gpu)
-    else:
-        gen_net = torch.nn.DataParallel(gen_net).cuda()
-        dis_net = torch.nn.DataParallel(dis_net).cuda()
-    print('------------------------------------------------------------')
-    print('The gpu on your deivce: cuda', np.arange(ngpus_per_node))
-    if args.gpu is not None:
-        print('However, you are just using gpu', args.gpu)
-    print('------------------------------------------------------------')
-
+    # Distributed computing is not used in our setting
+    # If you would like to use Gaussian GANs on larger datasets
+    # or larger model, please contact me: qilong.pan@kaust.edu.sa,
+    # we would consider to add the module of distributed computing.
+    torch.cuda.set_device(args.gpu)
+    gen_net.cuda(args.gpu)
+    dis_net.cuda(args.gpu)
     # model size for generator
-    summary(gen_net, (args.batch_size, args.noise_dim))
+    summary(gen_net, (args.batch_size, args.latent_dim))
 
     # set optimizer
     if args.optimizer == "adam":
@@ -227,277 +142,225 @@ def main_worker(gpu, ngpus_per_node, args):
         dis_optimizer = torch.optim.Adam(filter(lambda p: p.requires_grad, dis_net.parameters()),
                                         args.d_lr, (args.beta1, args.beta2), weight_decay=args.wd)
     else:
-        '''
-        TO DO: add other optimizer
-        '''
-        pass
-
-        
+        # TO DO: add other optimizer
+        raise NotImplementedError
+    # decay for learning rate
     gen_scheduler = LinearLrDecay(gen_optimizer, args.g_lr, 0.0, 0, args.max_iter * args.n_gen)
     dis_scheduler = LinearLrDecay(dis_optimizer, args.d_lr, 0.0, 0, args.max_iter * args.n_dis)
 
-    # initial
-    avg_gen_net = deepcopy(gen_net).cpu()
-    gen_avg_param = copy_params(avg_gen_net)
-    del avg_gen_net
+    # global setting for later training process
     start_epoch = 0
-    fixed_z = torch.cuda.FloatTensor(np.random.normal(0, 1, (args.eval_num, args.noise_dim)))
+    fixed_z = torch.cuda.FloatTensor(np.random.normal(0, 1, (args.eval_num, args.latent_dim)))
+    dis_best, p_dis_best, cor_dis_best, moment_dis_best = 99, 99, 99, 99
+
+    #-------------------------------------------------------------------#
+    #------------------------ Writer Configuration  --------------------#
+    # -------------------------------------------------------------------#
 
     # set writer
-    writer = None
-    if args.load_path:
-        print(f'=> resuming from {args.load_path}')
-        assert os.path.exists(args.load_path)
-        checkpoint_file = os.path.join(args.load_path)
-        assert os.path.exists(checkpoint_file)
-        loc = 'cuda:{}'.format(args.gpu)
-        checkpoint = torch.load(checkpoint_file, map_location=loc)
-        start_epoch = checkpoint['epoch']
-
-        dis_net.load_state_dict(checkpoint['dis_state_dict'])
-        gen_optimizer.load_state_dict(checkpoint['gen_optimizer'])
-        dis_optimizer.load_state_dict(checkpoint['dis_optimizer'])
-        
-        gen_net.load_state_dict(checkpoint['avg_gen_state_dict'])
-        gen_avg_param = copy_params(gen_net, mode='gpu')
-        gen_net.load_state_dict(checkpoint['gen_state_dict'])
-        fixed_z = checkpoint['fixed_z']
-
-        args.path_helper = checkpoint['path_helper']
-        logger = create_logger(args.path_helper['log_path']) if args.rank == 0 else None
-        print(f'=> loaded checkpoint {checkpoint_file} (epoch {start_epoch})')
-        writer = SummaryWriter(args.path_helper['log_path']) if args.rank == 0 else None
-        del checkpoint
-    else:
-    # create new log dir
-        assert args.exp_name
-        if args.rank == 0:
-            args.path_helper = set_log_dir('logs', args.exp_name)
-            logger = create_logger(args.path_helper['log_path'])
-            writer = SummaryWriter(args.path_helper['log_path'])
-    
-    if args.rank == 0:
-        logger.info(args)
+    assert args.exp_name
+    args.path_helper = set_log_dir('logs', args.exp_name)
+    logger = create_logger(args.path_helper['log_path'])
+    writer = SummaryWriter(args.path_helper['log_path'])
+    logger.info(args)
     writer_dict = {
         'writer': writer,
         'train_global_steps': start_epoch * len(train_loader),
-        'valid_global_steps': start_epoch // args.val_freq,
+        'valid_global_steps': start_epoch,
     }
     print('------------------------------------------------------------')
-    print(f"Log file path: {args.path_helper['prefix']}") if args.rank == 0 else 0
+    print(f"Log file path: {args.path_helper['prefix']}")
     print('------------------------------------------------------------')
 
     # wandb ai monitoring
     # project_name = 'loss: ' + args.loss + ', n_gen: ' + str(args.n_gen) + ', n_dis: '+ str(args.n_dis)
-    project_name = 'n_gen: ' + str(args.n_gen) + ', n_dis: ' + str(args.n_dis) + ', ' + \
-                   str(args.simu_channels) + '*' + str(args.simu_dim) + \
-                   (str('trans') if args.transform else '') + (str('trun') if args.truncate else '')
+    if args.dataset == 'Simulation':
+        project_name = 'n_gen: ' + str(args.n_gen) + ', n_dis: ' + str(args.n_dis) + ', ' + \
+                       str(args.simu_channels) + '*' + str(args.simu_dim) + \
+                       (str('trans') if args.transform else '') + (str('trun') if args.truncate else '')
+    else:
+        project_name = 'n_gen: ' + str(args.n_gen) + ', n_dis: ' + str(args.n_dis) + ', ' + str(args.latent_dim)
     wandb.init(project=args.dataset + args.exp_name, entity="qilong77", name = project_name)
     wandb.config = {
         "epochs": int(args.epochs) - int(start_epoch),
         "batch_size": args.batch_size
     }
 
-    dis_best, p_dis_best, cor_dis_best, moment_dis_best = 99, 99, 99, 99
-
     # train loop
     for epoch in range(int(start_epoch), int(args.epochs)):
         lr_schedulers = (gen_scheduler, dis_scheduler) if args.lr_decay else None
-        train(args, gen_net, dis_net, gen_optimizer, dis_optimizer, gen_avg_param,
+        train(args, gen_net, dis_net, gen_optimizer, dis_optimizer,
               train_loader, epoch, writer_dict, lr_schedulers)
 
+        # Monitor for traing process
         # save the generated time series after using PCA and t-SNE
-        if args.rank == 0 or args.show:
-            if (epoch) % args.eval_epochs == 0:
-                #backup_param = copy_params(gen_net)
-                #load_params(gen_net, gen_avg_param, args, mode="cpu")
-                # load_params(gen_net, backup_param, args)
-                with torch.no_grad():
-                    # sample_imgs is on GPU device
-                    sample_imgs = gen_net(fixed_z).detach()
-                # save_samples(args, fixed_z[0].reshape(1, -1), epoch + 1, gen_net, writer_dict)
+        if (epoch) % args.eval_epochs == 0:
+            with torch.no_grad():
+                # sample_imgs is on GPU device
+                sample_imgs = gen_net(fixed_z).detach()
+            # Ground Truth in Simulation
+            if args.dataset == 'Simulation':
+                # inverse transformation
+                # [batch_size, channels, seq_length]
+                ori_imgs = torch.log(sample_imgs - 1).to('cpu').numpy()
+                # [batch_size, channels, seq_length] -> [batch_size, channels * seq_length]
+                ori_imgs = rearrange(ori_imgs, 'b c l -> b (c l)')
+                mean_est = np.mean(ori_imgs, axis=0)
+                mean_dis = np.sqrt(np.sum((mean_est - train_set.mean) ** 2)) / ori_imgs.shape[1]
+                wandb.log({
+                    'Mean distance (L2)': mean_dis
+                })
+                cov_dis = np.sum((np.corrcoef(ori_imgs.T) - train_set.cor) ** 2)
+                wandb.log({
+                    'Correlation matrix distance (L2)': cov_dis
+                })
 
-                # Ground Truth in Simulation
-                if args.dataset == 'Simulation':
-                    # inverse transformation
-                    # [batch_size, channels, seq_length]
-                    ori_imgs = torch.log(sample_imgs -1).to('cpu').numpy()
-                    # [batch_size, channels, seq_length] -> [batch_size, channels * seq_length]
-                    ori_imgs = rearrange(ori_imgs, 'b c l -> b (c l)')
+            # visualization for generated data
+            visualization(ori_data=train_set[:args.eval_num],
+                          generated_data=sample_imgs.to('cpu'), analysis='pca',
+                          save_name=args.exp_name, epoch=epoch, args=args)
+            with torch.no_grad():
+                sample_trans_imgs = gen_inv_net(sample_imgs.to('cuda:' + str(args.gpu))).detach().to('cpu')
+            qqplot(sample_trans_imgs.squeeze(1), epoch=epoch, args=args,
+                   save_name=args.exp_name)
+            heatmap_cor(sample_trans_imgs.squeeze(1), epoch=epoch, args=args,
+                        save_name=args.exp_name)
 
-                    mean_est = np.mean(ori_imgs, axis=0)
-                    mean_dis = np.sqrt(np.sum((mean_est - train_set.mean)**2)) / ori_imgs.shape[1]
-                    wandb.log({
-                        'Mean distance (L2)': mean_dis
-                    })
+            # visualization for Ground truth data
+            name_ground_truth = args.exp_name + str('ground')
+            visualization(ori_data=train_set[:args.eval_num],
+                          generated_data=test_set[:args.eval_num],
+                          analysis='pca', save_name=name_ground_truth, epoch=epoch, args=args)
+            with torch.no_grad():
+                sample_trans_imgs_ground = gen_inv_net(
+                    torch.from_numpy(test_set[:args.eval_num]).type(torch.cuda.FloatTensor).cuda(args.gpu,
+                                                                                                 non_blocking=True)).detach().to(
+                    'cpu')
+            qqplot(sample_trans_imgs_ground.squeeze(1), epoch=epoch, args=args,
+                   save_name=name_ground_truth)
+            heatmap_cor(sample_trans_imgs_ground.squeeze(1), epoch=epoch, args=args,
+                        save_name=name_ground_truth)
+            dis_ground, p_dis_ground, cor_dis_ground, moment_dis_ground = diff_cor(sample_trans_imgs_ground.squeeze(1))
+            if epoch < 100:
+                is_best_dis, is_best_p, is_best_cor, is_best_moment = False, False, False, False
+                dis, p_dis, cor_dis, moment_dis = diff_cor(sample_trans_imgs.squeeze(1))
+            else:
+                dis, p_dis, cor_dis, moment_dis = diff_cor(sample_trans_imgs.squeeze(1))
+                if dis < dis_best:
+                    dis_best = dis
+                    is_best_dis = True
+                if p_dis < p_dis_best:
+                    p_dis_best = p_dis
+                    is_best_p = True
+                if cor_dis < cor_dis_best:
+                    cor_dis_best = cor_dis
+                    is_best_cor = True
+                if moment_dis < moment_dis_best:
+                    moment_dis_best = moment_dis
+                    is_best_moment = True
 
-                    cov_dis = np.sum((np.corrcoef(ori_imgs.T) - train_set.cor)**2)
-                    wandb.log({
-                        'Correlation matrix distance (L2)': cov_dis
-                    })
+            # wandb for generated data
+            visu_pca = plt.imread(
+                os.path.join(args.path_helper['log_path_img_pca'], f'{args.exp_name}_epoch_{epoch + 1}.png'))
+            visu_qqplot = plt.imread(
+                os.path.join(args.path_helper['log_path_img_qqplot'], f'{args.exp_name}_epoch_{epoch + 1}.png'))
+            visu_heatmap = plt.imread(
+                os.path.join(args.path_helper['log_path_img_heatmap'], f'{args.exp_name}_epoch_{epoch + 1}.png'))
+            img_visu_pca = wandb.Image(visu_pca, caption="Epoch: " + str(epoch))
+            img_visu_qqplot = wandb.Image(visu_qqplot, caption="Epoch: " + str(epoch))
+            img_visu_heatmap = wandb.Image(visu_heatmap, caption="Epoch: " + str(epoch))
+            wandb.log({'PCA': img_visu_pca,
+                       'QQplot': img_visu_qqplot,
+                       'Heatmap': img_visu_heatmap})
 
+            # wand for ground truth
+            visu_pca_ground = plt.imread(
+                os.path.join(args.path_helper['log_path_img_pca'], f'{name_ground_truth}_epoch_{epoch + 1}.png'))
+            visu_qqplot_ground = plt.imread(
+                os.path.join(args.path_helper['log_path_img_qqplot'], f'{name_ground_truth}_epoch_{epoch + 1}.png'))
+            visu_heatmap_ground = plt.imread(
+                os.path.join(args.path_helper['log_path_img_heatmap'], f'{name_ground_truth}_epoch_{epoch + 1}.png'))
+            img_visu_pca_ground = wandb.Image(visu_pca_ground, caption="Epoch: " + str(epoch))
+            img_visu_qqplot_ground = wandb.Image(visu_qqplot_ground, caption="Epoch: " + str(epoch))
+            img_visu_heatmap_ground = wandb.Image(visu_heatmap_ground, caption="Epoch: " + str(epoch))
+            wandb.log({'Ground-truth PCA': img_visu_pca_ground,
+                       'Ground-truth QQplot': img_visu_qqplot_ground,
+                       'Ground-truth Heatmap': img_visu_heatmap_ground})
+            wandb.log({'Distance': dis,
+                       'p-value': p_dis,
+                       'cor_distance': cor_dis,
+                       'moment_dis': moment_dis,
+                       'Ground_Distance': dis_ground,
+                       'Ground_p-value': p_dis_ground,
+                       'Ground_cor_distance': cor_dis_ground,
+                       'Ground_moment_dis': moment_dis_ground,
+                       })
 
+            writer.add_scalar('S', dis, epoch)
+            writer.add_scalar('S1', moment_dis, epoch)
+            writer.add_scalar('S2', cor_dis, epoch)
+            writer.add_scalar('S3', p_dis, epoch)
+            writer.add_image('PCA' + str(epoch), visu_pca, epoch, dataformats='HWC')
+            writer.add_image('QQ-plot' + str(epoch), visu_qqplot, epoch, dataformats='HWC')
+            writer.add_image('Heatmap-correlation-matrix' + str(epoch), visu_heatmap, epoch, dataformats='HWC')
+            writer.add_image('Ground-truth-PCA' + str(epoch), visu_pca_ground, epoch, dataformats='HWC')
+            writer.add_image('Ground-truth-QQ-plot' + str(epoch), visu_qqplot_ground, epoch, dataformats='HWC')
+            writer.add_image('Ground-truth-Heatmap-correlation-matrix' + str(epoch), visu_heatmap_ground, epoch,
+                             dataformats='HWC')
 
-                # visualization for generated data
-                visualization(ori_data=train_set[:args.eval_num],
-                              generated_data=sample_imgs.to('cpu'), analysis='pca',
-                              save_name=args.exp_name, epoch=epoch, args=args)
-                with torch.no_grad():
-                    sample_trans_imgs = gen_inv_net(sample_imgs.to('cuda:'+str(args.gpu))).detach().to('cpu')
-                qqplot(sample_trans_imgs.squeeze(1), epoch=epoch, args=args,
-                       save_name=args.exp_name)
-                heatmap_cor(sample_trans_imgs.squeeze(1), epoch=epoch, args=args,
-                            save_name=args.exp_name)
+            # image = rearrange(image, 'h w c -> c h w')
+            # writer.add_image('Comparison for original and generative data based on PCA', image, epoch + 1)
 
-                # visualization
-                # Ground truth data
-                name_ground_truth = args.exp_name + str('ground')
-                visualization(ori_data=train_set[:args.eval_num],
-                              generated_data=test_set[:args.eval_num],
-                              analysis='pca', save_name=name_ground_truth, epoch=epoch, args=args)
-                with torch.no_grad():
-                    sample_trans_imgs_ground = gen_inv_net(torch.from_numpy(test_set[:args.eval_num]).type(torch.cuda.FloatTensor).cuda(args.gpu, non_blocking=True)).detach().to('cpu')
-                qqplot(sample_trans_imgs_ground.squeeze(1), epoch=epoch, args=args,
-                       save_name=name_ground_truth)
-                heatmap_cor(sample_trans_imgs_ground.squeeze(1), epoch=epoch, args=args,
-                            save_name=name_ground_truth)
-
-                dis_ground, p_dis_ground, cor_dis_ground, moment_dis_ground = diff_cor(sample_trans_imgs_ground.squeeze(1))
-
-                if epoch < 100:
-                    is_best_dis, is_best_p, is_best_cor, is_best_moment = False, False, False, False
-                    dis, p_dis, cor_dis, moment_dis = diff_cor(sample_trans_imgs.squeeze(1))
-                else:
-                    dis, p_dis, cor_dis, moment_dis = diff_cor(sample_trans_imgs.squeeze(1))
-                    if dis < dis_best:
-                        dis_best = dis
-                        is_best_dis = True
-                    if p_dis < p_dis_best:
-                        p_dis_best = p_dis
-                        is_best_p = True
-                    if cor_dis < cor_dis_best:
-                        cor_dis_best = cor_dis
-                        is_best_cor = True
-                    if moment_dis < moment_dis_best:
-                        moment_dis_best = moment_dis
-                        is_best_moment = True
-
-                # wandb for generated data
-                visu_pca = plt.imread(
-                    os.path.join(args.path_helper['log_path_img_pca'], f'{args.exp_name}_epoch_{epoch + 1}.png'))
-                visu_qqplot = plt.imread(
-                    os.path.join(args.path_helper['log_path_img_qqplot'], f'{args.exp_name}_epoch_{epoch + 1}.png'))
-                visu_heatmap = plt.imread(
-                    os.path.join(args.path_helper['log_path_img_heatmap'], f'{args.exp_name}_epoch_{epoch + 1}.png'))
-                img_visu_pca = wandb.Image(visu_pca, caption="Epoch: " + str(epoch))
-                img_visu_qqplot = wandb.Image(visu_qqplot, caption="Epoch: " + str(epoch))
-                img_visu_heatmap = wandb.Image(visu_heatmap, caption="Epoch: " + str(epoch))
-                wandb.log({'PCA': img_visu_pca,
-                           'QQplot': img_visu_qqplot,
-                           'Heatmap': img_visu_heatmap})
-
-                # wand for ground truth
-                visu_pca_ground = plt.imread(
-                    os.path.join(args.path_helper['log_path_img_pca'], f'{name_ground_truth}_epoch_{epoch + 1}.png'))
-                visu_qqplot_ground = plt.imread(
-                    os.path.join(args.path_helper['log_path_img_qqplot'], f'{name_ground_truth}_epoch_{epoch + 1}.png'))
-                visu_heatmap_ground = plt.imread(
-                    os.path.join(args.path_helper['log_path_img_heatmap'], f'{name_ground_truth}_epoch_{epoch + 1}.png'))
-                img_visu_pca_ground = wandb.Image(visu_pca_ground, caption="Epoch: " + str(epoch))
-                img_visu_qqplot_ground = wandb.Image(visu_qqplot_ground, caption="Epoch: " + str(epoch))
-                img_visu_heatmap_ground = wandb.Image(visu_heatmap_ground, caption="Epoch: " + str(epoch))
-                wandb.log({'Ground-truth PCA': img_visu_pca_ground,
-                           'Ground-truth QQplot': img_visu_qqplot_ground,
-                           'Ground-truth Heatmap': img_visu_heatmap_ground})
-                wandb.log({'Distance': dis,
-                           'p-value': p_dis,
-                           'cor_distance': cor_dis,
-                           'moment_dis': moment_dis,
-                           'Ground_Distance': dis_ground,
-                           'Ground_p-value': p_dis_ground,
-                           'Ground_cor_distance': cor_dis_ground,
-                           'Ground_moment_dis': moment_dis_ground,
-                           })
-
-                writer.add_scalar('S', dis, epoch)
-                writer.add_scalar('S1', moment_dis, epoch)
-                writer.add_scalar('S2', cor_dis, epoch)
-                writer.add_scalar('S3', p_dis, epoch)
-                writer.add_image('PCA' + str(epoch), visu_pca, epoch, dataformats='HWC')
-                writer.add_image('QQ-plot' + str(epoch), visu_qqplot, epoch, dataformats='HWC')
-                writer.add_image('Heatmap-correlation-matrix' + str(epoch), visu_heatmap, epoch, dataformats='HWC')
-                writer.add_image('Ground-truth-PCA' + str(epoch), visu_pca_ground, epoch, dataformats='HWC')
-                writer.add_image('Ground-truth-QQ-plot' + str(epoch), visu_qqplot_ground, epoch, dataformats='HWC')
-                writer.add_image('Ground-truth-Heatmap-correlation-matrix' + str(epoch), visu_heatmap_ground, epoch, dataformats='HWC')
-
-                # image = rearrange(image, 'h w c -> c h w')
-                # writer.add_image('Comparison for original and generative data based on PCA', image, epoch + 1)
-
-                # save the best model
-                if epoch >= 100:
-                    if is_best_dis:
-                        save_checkpoint({
-                            'epoch': epoch + 1,
-                            'gen_model': args.gen_model,
-                            'dis_model': args.dis_model,
-                            'gen_state_dict': gen_net.state_dict(),
-                            'dis_state_dict': dis_net.state_dict(),
-                            'gen_optimizer': gen_optimizer.state_dict(),
-                            'dis_optimizer': dis_optimizer.state_dict(),
-                            'path_helper': args.path_helper,
-                        }, args.path_helper['ckpt_path'], filename="checkpoint_best_dis")
-                        is_best_dis = False
-                    elif is_best_moment:
-                        save_checkpoint({
-                            'epoch': epoch + 1,
-                            'gen_model': args.gen_model,
-                            'dis_model': args.dis_model,
-                            'gen_state_dict': gen_net.state_dict(),
-                            'dis_state_dict': dis_net.state_dict(),
-                            'gen_optimizer': gen_optimizer.state_dict(),
-                            'dis_optimizer': dis_optimizer.state_dict(),
-                            'path_helper': args.path_helper,
-                        }, args.path_helper['ckpt_path'], filename="checkpoint_best_moment")
-                        is_best_moment = False
-                    elif is_best_cor:
-                        save_checkpoint({
-                            'epoch': epoch + 1,
-                            'gen_model': args.gen_model,
-                            'dis_model': args.dis_model,
-                            'gen_state_dict': gen_net.state_dict(),
-                            'dis_state_dict': dis_net.state_dict(),
-                            'gen_optimizer': gen_optimizer.state_dict(),
-                            'dis_optimizer': dis_optimizer.state_dict(),
-                            'path_helper': args.path_helper,
-                        }, args.path_helper['ckpt_path'], filename="checkpoint_best_cor")
-                        is_best_cor = False
-                    elif is_best_p:
-                        save_checkpoint({
-                            'epoch': epoch + 1,
-                            'gen_model': args.gen_model,
-                            'dis_model': args.dis_model,
-                            'gen_state_dict': gen_net.state_dict(),
-                            'dis_state_dict': dis_net.state_dict(),
-                            'gen_optimizer': gen_optimizer.state_dict(),
-                            'dis_optimizer': dis_optimizer.state_dict(),
-                            'path_helper': args.path_helper,
-                        }, args.path_helper['ckpt_path'], filename="checkpoint_best_p")
-                        is_best_p = False
-
-        # avg_gen_net = deepcopy(gen_net)
-        # load_params(avg_gen_net, gen_avg_param, args)
-        # save_checkpoint({
-        #     'epoch': epoch + 1,
-        #     'gen_model': args.gen_model,
-        #     'dis_model': args.dis_model,
-        #     'gen_state_dict': gen_net.state_dict(),
-        #     'dis_state_dict': dis_net.state_dict(),
-        #     'avg_gen_state_dict': avg_gen_net.state_dict(),
-        #     'gen_optimizer': gen_optimizer.state_dict(),
-        #     'dis_optimizer': dis_optimizer.state_dict(),
-        #     'path_helper': args.path_helper,
-        # }, args.path_helper['ckpt_path'], filename="checkpoint")
-        # del avg_gen_net
+            # save the best model
+            if epoch >= 100:
+                if is_best_dis:
+                    save_checkpoint({
+                        'epoch': epoch + 1,
+                        'gen_model': args.gen_model,
+                        'dis_model': args.dis_model,
+                        'gen_state_dict': gen_net.state_dict(),
+                        'dis_state_dict': dis_net.state_dict(),
+                        'gen_optimizer': gen_optimizer.state_dict(),
+                        'dis_optimizer': dis_optimizer.state_dict(),
+                        'path_helper': args.path_helper,
+                    }, args.path_helper['ckpt_path'], filename="checkpoint_best_dis")
+                    is_best_dis = False
+                elif is_best_moment:
+                    save_checkpoint({
+                        'epoch': epoch + 1,
+                        'gen_model': args.gen_model,
+                        'dis_model': args.dis_model,
+                        'gen_state_dict': gen_net.state_dict(),
+                        'dis_state_dict': dis_net.state_dict(),
+                        'gen_optimizer': gen_optimizer.state_dict(),
+                        'dis_optimizer': dis_optimizer.state_dict(),
+                        'path_helper': args.path_helper,
+                    }, args.path_helper['ckpt_path'], filename="checkpoint_best_moment")
+                    is_best_moment = False
+                elif is_best_cor:
+                    save_checkpoint({
+                        'epoch': epoch + 1,
+                        'gen_model': args.gen_model,
+                        'dis_model': args.dis_model,
+                        'gen_state_dict': gen_net.state_dict(),
+                        'dis_state_dict': dis_net.state_dict(),
+                        'gen_optimizer': gen_optimizer.state_dict(),
+                        'dis_optimizer': dis_optimizer.state_dict(),
+                        'path_helper': args.path_helper,
+                    }, args.path_helper['ckpt_path'], filename="checkpoint_best_cor")
+                    is_best_cor = False
+                elif is_best_p:
+                    save_checkpoint({
+                        'epoch': epoch + 1,
+                        'gen_model': args.gen_model,
+                        'dis_model': args.dis_model,
+                        'gen_state_dict': gen_net.state_dict(),
+                        'dis_state_dict': dis_net.state_dict(),
+                        'gen_optimizer': gen_optimizer.state_dict(),
+                        'dis_optimizer': dis_optimizer.state_dict(),
+                        'path_helper': args.path_helper,
+                    }, args.path_helper['ckpt_path'], filename="checkpoint_best_p")
+                    is_best_p = False
 
     print('===============================================')
     print('Training Finished & Model Saved, the path is: ', args.path_helper['ckpt_path']+ '/'+ 'checkpoint')
