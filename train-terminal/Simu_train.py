@@ -6,7 +6,7 @@ os.system(f"CUDA_VISIBLE_DEVICES=0,1,2,3,4,5,6,7 python ../train_GAN.py \
 --gpu 0 \
 --dataset Simulation \
 --transform True \
---noise_dim 16 \
+--latent_dim 16 \
 --simu_dim 64 \
 --simu_channels 4 \
 --g_lr 0.0001 \

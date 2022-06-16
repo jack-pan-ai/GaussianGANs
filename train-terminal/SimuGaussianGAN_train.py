@@ -3,12 +3,13 @@
 import os
 import argparse
 
-os.system(f"CUDA_VISIBLE_DEVICES=0,1,2,3,4,5,6,7 python ../train_inverseGAN.py \
+os.system(f"CUDA_VISIBLE_DEVICES=0,1,2,3,4,5,6,7 python ../train_GaussianGAN.py \
 --gpu 0 \
 --dataset Simulation \
+--transform True \
 --simu_dim 150 \
 --simu_channels 3 \
---noise_dim 64 \
+--latent_dim 64 \
 --g_lr 0.0001 \
 --d_lr 0.0003 \
 --loss lsgan \

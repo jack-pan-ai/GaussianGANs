@@ -95,7 +95,6 @@ def parse_args():
     parser.add_argument('--init_type', type=str, default='xavier_uniform',
                         choices=['normal', 'orth', 'xavier_uniform', 'false'],
                         help='The init type')
-    opt = parser.parse_args()
 
     # Simulation setting for Gaussian Random Field and Vector AR(1) model
     parser.add_argument('--transform', type=bool, default=False,
@@ -107,4 +106,5 @@ def parse_args():
     parser.add_argument('--simu_channels', type=int, default=3,
                         help='The channels of simulated Gaussian Random Fields')
 
+    opt = parser.parse_args()
     return opt

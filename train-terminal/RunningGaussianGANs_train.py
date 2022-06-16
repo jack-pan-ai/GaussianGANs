@@ -3,7 +3,7 @@
 import os
 import argparse
 
-os.system(f"CUDA_VISIBLE_DEVICES=0,1,2,3,4,5,6,7 python ../train_inverseGAN.py \
+os.system(f"CUDA_VISIBLE_DEVICES=0,1,2,3,4,5,6,7 python ../train_GaussianeGAN.py \
 --gpu 0 \
 --dataset UniMiB \
 --latent_dim 16 \
