@@ -71,8 +71,8 @@ python JumpingGAN_Train.py
        
  - [x] ~~Do the simulation on stationary Vector AR(1) model~~. CANNOT achieve a good result.
 
+If you would like to explore simulation part, the following may be helpful to you.
 
-## Exploration in future 
 ### Simulation part 
 
 1. (Optional) Training the Gaussian GANs to transform the Gaussian Random field (GRF) into strandard multivariate Gaussian distribution;
