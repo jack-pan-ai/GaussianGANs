@@ -11,7 +11,7 @@ from utils.utils import set_log_dir, save_checkpoint, create_logger
 from utils.visualizationMetrics import visualization
 from utils.statEstimate import *
 from utils.utils import load_checkpoint
-from models.inverseGANModels import inverseGenerator
+from models.GaussianGANModels import inverseGenerator
 
 import torch
 import torch.utils.data.distributed
@@ -88,7 +88,7 @@ def main_worker(gpu, args):
     elif args.dataset == 'Simulation':
         train_set = MultiNormaldataset(latent_dim=args.latent_dim, size=10000,  mode='train',
                                        channels = args.simu_channels,  simu_dim=args.simu_dim,
-                                       transform=args.transform, truncate=args.truncate, appendix='new')
+                                       transform=args.transform, truncate=args.truncate)
         train_loader = data.DataLoader(train_set, batch_size=args.batch_size, num_workers=args.num_workers, shuffle=True)
         test_set = MultiNormaldataset(latent_dim=args.latent_dim, size=args.eval_num, mode='test',
                                       channels = args.simu_channels, transform=args.transform,

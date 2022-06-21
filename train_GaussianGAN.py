@@ -4,7 +4,7 @@ from __future__ import print_function
 
 from config import cfg
 from dataset.UniMiB.dataLoader import *
-from models.inverseGANModels import *
+from models.GaussianGANModels import *
 from utils.functions import inverse_train, LinearLrDecay
 from utils.utils import set_log_dir, save_checkpoint, create_logger
 from utils.visualizationMetrics import visualization
