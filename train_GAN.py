@@ -316,8 +316,6 @@ def main_worker(gpu, args):
                 if is_best_dis:
                     save_checkpoint({
                         'epoch': epoch + 1,
-                        'gen_model': args.gen_model,
-                        'dis_model': args.dis_model,
                         'gen_state_dict': gen_net.state_dict(),
                         'dis_state_dict': dis_net.state_dict(),
                         'gen_optimizer': gen_optimizer.state_dict(),
@@ -328,8 +326,6 @@ def main_worker(gpu, args):
                 elif is_best_moment:
                     save_checkpoint({
                         'epoch': epoch + 1,
-                        'gen_model': args.gen_model,
-                        'dis_model': args.dis_model,
                         'gen_state_dict': gen_net.state_dict(),
                         'dis_state_dict': dis_net.state_dict(),
                         'gen_optimizer': gen_optimizer.state_dict(),
@@ -340,8 +336,6 @@ def main_worker(gpu, args):
                 elif is_best_cor:
                     save_checkpoint({
                         'epoch': epoch + 1,
-                        'gen_model': args.gen_model,
-                        'dis_model': args.dis_model,
                         'gen_state_dict': gen_net.state_dict(),
                         'dis_state_dict': dis_net.state_dict(),
                         'gen_optimizer': gen_optimizer.state_dict(),
@@ -352,8 +346,6 @@ def main_worker(gpu, args):
                 elif is_best_p:
                     save_checkpoint({
                         'epoch': epoch + 1,
-                        'gen_model': args.gen_model,
-                        'dis_model': args.dis_model,
                         'gen_state_dict': gen_net.state_dict(),
                         'dis_state_dict': dis_net.state_dict(),
                         'gen_optimizer': gen_optimizer.state_dict(),

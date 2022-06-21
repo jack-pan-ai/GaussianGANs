@@ -2,6 +2,13 @@
 <project version="4">
   <component name="PublishConfigData" autoUpload="Always" serverName="panq@rooster-GaussianGANs" deleteMissingItems="true" createEmptyFolders="true" remoteFilesAllowedToDisappearOnAutoupload="false" autoUploadExternalChanges="true">
     <serverData>
+      <paths name="panq@peacock">
+        <serverdata>
+          <mappings>
+            <mapping deploy="/home/panq/python_project/temspGANs" local="$PROJECT_DIR$" web="/" />
+          </mappings>
+        </serverdata>
+      </paths>
       <paths name="panq@rooster-GaussianGANs">
         <serverdata>
           <mappings>
