@@ -65,7 +65,7 @@ python JumpingGAN_Train.py
  - **Visualization Tools**
  The heatmap for correlation matrix, QQ-plot, and PCA/t-SNE are all contained in the ```./utils```
  
- ## TO DO
+ ## Misc (Optional)
  
  - [x] ~~Do the simulation on Gaussian Random Field (GRF)~~. CANNOT achieve a good result.
        
