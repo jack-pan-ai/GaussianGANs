@@ -1,4 +1,6 @@
 # Gaussian GANs
+Vision transformer used in the discriminator architecture.
+
 Paper: Visually Evaluating Generative Adversarial Networks Using Itself under Multivariate Time Series (https://arxiv.org/abs/2208.02649)
 
 
